@@ -1,0 +1,26 @@
+{% extends "base_bootstrap.html" %}
+{% block head %}
+
+{% assets "proxy-empty-js" %}
+<script type="text/javascript" src="{{ ASSET_URL }}"></script>
+{% endassets %}
+
+<script>
+wbinfo = {}
+wbinfo.url = "";
+wbinfo.proxy_user = "{{ user }}";
+wbinfo.proxy_coll = "{{ coll }}";
+wbinfo.proxy_rec = "{{ rec }}";
+wbinfo.proxy_mode = "{{ type }}";
+wbinfo.proxy_ip = "{{ proxy_ip }}";
+wbinfo.curr_browser = "{{ browser }}";
+
+</script>
+{% endblock %}
+
+{% block body %}
+<h1>Standby...</h1>
+{% endblock %}
+
+
+

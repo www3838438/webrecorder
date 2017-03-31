@@ -115,7 +115,12 @@ bundles:
             - pkg://pywb/static/wombat.js
             - pkg://pywb/static/wb.js
             - pkg://pywb/static/vidrw.js
+
+    proxy-empty-js:
+        output: bundle/proxy-empty.js
+        contents:
             - wrscripts.js
+            - ws.js
 
     proxy-js:
         output: bundle/proxy.js

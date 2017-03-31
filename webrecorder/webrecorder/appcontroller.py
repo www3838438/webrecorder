@@ -368,6 +368,11 @@ class AppController(BaseController):
         def faq():
             return {}
 
+        @self.bottle_app.route('/_standby')
+        @self.jinja2_view('standby.html')
+        def standby():
+            return {}
+
         @self.bottle_app.route('/static/<path:path>')
         def static_files(path):
             return static_file(path, root=self.static_root)

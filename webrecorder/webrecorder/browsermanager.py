@@ -80,6 +80,9 @@ class BrowserManager(object):
                           'remote_ip': kwargs.get('remote_ip', ''),
                          }
 
+        return self.request_prepared_browser(browser_id, container_data)
+
+    def request_prepared_browser(self, browser_id, container_data):
         try:
             req_url = self.browser_req_url.format(browser=browser_id)
             r = requests.post(req_url, data=container_data)
@@ -99,13 +102,13 @@ class BrowserManager(object):
         # get canonical browser id
         browser_id = res.get('id')
 
-        kwargs['browser'] = browser_id
+        container_data['browser'] = browser_id
 
         # browser page insert
         data = {'browser': browser_id,
                 'browser_data': self.browsers.get(browser_id),
-                'url': wb_url.url,
-                'ts': wb_url.timestamp,
+                'url': container_data['url'],
+                'ts': container_data['request_ts'],
                 'reqid': reqid,
                 'inactive_time': self.inactive_time,
                }

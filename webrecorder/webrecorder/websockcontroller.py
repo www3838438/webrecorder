@@ -6,6 +6,7 @@ import gevent
 import gevent.queue
 
 from webrecorder.basecontroller import BaseController
+import traceback
 
 
 # ============================================================================
@@ -140,9 +141,13 @@ class BaseWebSockHandler(object):
         if not ready[0]:
             self._recv_ws()
 
+        accum_buff = None
+
         for fd in ready[0]:
             if fd == websocket_fd:
-                self.handle_client_msg(self._recv_ws())
+                buff = self._recv_ws()
+                accum_buff = buff if not accum_buff else accum_buff + buff
+                accum_buff = self.handle_client_msg(accum_buff)
 
             elif len(fd_list) == 2 and fd == fd_list[1]:
 
@@ -167,8 +172,9 @@ class BaseWebSockHandler(object):
         try:
             msg = json.loads(msg.decode('utf-8'))
         except Exception as e:
-            print('WS MSG ERR', e, len(msg))
-            return
+            traceback.print_exc()
+            print('*** WS MSG ERR', self.channel, e, len(msg))
+            return msg
 
         if msg['ws_type'] == 'skipreq':
             url = msg['url']
@@ -198,13 +204,17 @@ class BaseWebSockHandler(object):
             self.rec = msg['rec']
             self.manager.browser_mgr.switch_upstream(msg['rec'], msg['type'], self.reqid)
 
+        elif msg['ws_type'] == 'extract-resp' and from_browser:
+            if msg['phase'] in ('start', 'end'):
+                print(from_browser, msg['phase'])
+
         # send to remote browser cmds
         if to_browser:
-            if msg['ws_type'] in ('set_url', 'autoscroll', 'load_all', 'switch', 'snapshot-req'):
+            if msg['ws_type'] in ('set_url', 'autoscroll', 'extract-req', 'switch', 'snapshot-req'):
                 self._publish(to_browser, msg)
 
         elif from_browser:
-            if msg['ws_type'] in ('remote_url', 'patch_req', 'snapshot'):
+            if msg['ws_type'] in ('remote_url', 'patch_req', 'snapshot', 'extract-resp'):
                 self._publish(from_browser, msg)
 
 

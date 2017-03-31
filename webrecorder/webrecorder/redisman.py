@@ -1364,7 +1364,9 @@ class CLIRedisDataManager(RedisDataManager):
 
 
 # ============================================================================
-def init_manager_for_cli():
+def init_manager_for_cli(config=None, browser_mgr=None,
+                         browser_redis=None, content_app=None):
+
     config = load_wr_config()
 
     # Init Redis
@@ -1376,7 +1378,7 @@ def init_manager_for_cli():
     cork = WebRecCork.create_cork(r, config)
 
     # Init Manager
-    manager = CLIRedisDataManager(r, cork, None, None, None, config)
+    manager = CLIRedisDataManager(r, cork, content_app, browser_redis, browser_mgr, config)
     manager.fake_session = Session(cork, {}, '', {'anon': True}, -1, False)
 
     return manager

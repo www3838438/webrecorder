@@ -19,7 +19,8 @@ class BaseController(object):
         self.content_host = os.environ['CONTENT_HOST']
         self.cache_template = config.get('cache_template')
 
-        self.init_routes()
+        if self.app:
+            self.init_routes()
 
     def init_routes(self):
         raise NotImplemented()
