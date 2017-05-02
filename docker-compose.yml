@@ -1,15 +1,15 @@
 version: '2'
 
 services:
- #   automator:
- #       build: ./webrecorder
- #       command: python -m webrecorder.automator
+    automator:
+        build: ./webrecorder
+        command: python -m webrecorder.automator
 
- #       env_file:
- #           - ./wr.env
+        env_file:
+            - ./wr.env
 
- #       volumes:
- #           - ./webrecorder/:/code/
+        volumes:
+            - ./webrecorder/:/code/
 
     app:
         build: ./webrecorder
@@ -99,7 +99,7 @@ services:
             - CLUSTER_NAME=wr_users
             - NETWORK_NAME=webrecorder_browsers
             - CONTAINER_EXPIRE_SECS=1200
-            - IDLE_TIMEOUT=120
+            - IDLE_TIMEOUT=12000
 
 
         depends_on:

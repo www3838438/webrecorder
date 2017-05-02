@@ -5,7 +5,9 @@ from webrecorder.utils import load_wr_config
 from webrecorder.contentcontroller import ContentController
 from webrecorder.browsermanager import BrowserManager
 
-from pywb.utils.timeutils import timestamp_now
+from warcio.timeutils import timestamp_now
+
+from pywb.utils.canonicalize import canonicalize
 
 import os
 import redis
@@ -53,14 +55,13 @@ class Automator(object):
 
         self.auto_key = 'r:{user}:{coll}:{rec}:auto'
         self.auto_br_key = 'r:{user}:{coll}:{rec}:auto:br'
-        self.q_key = 'c:{user}:{coll}:q'
-        self.qp_key = 'c:{user}:{coll}:qp'
-        self.qn_key = 'c:{user}:{coll}:qn'
+        self.q_key = 'c:{user}:{coll}:{rec}:q'
+        self.qp_key = 'c:{user}:{coll}:{rec}:qp'
+        self.qn_key = 'c:{user}:{coll}:{rec}:qn'
         self.REQ_TIME = 120
-        self.NUM_BROWSERS = 3
+        self.NUM_BROWSERS = 1
 
         self.START_URL = 'http://webrecorder.io/_standby'
-
 
     def loop_msg(self):
         #for item in self.pubsub.listen():
@@ -82,7 +83,14 @@ class Automator(object):
 
         if msg['ws_type'] == 'remote_url':
             logging.debug(str(channel) + ': ' + str(msg))
-            self.send_response(reqid, {'ws_type': 'extract-req'})
+
+            if self.should_extract_links(user, coll, rec, msg['page']):
+                self.send_response(reqid, {'ws_type': 'extract-req'})
+            else:
+                logging.debug('Loading next on {0}'.format(reqid))
+                #self.check_done(user, coll, rec, msg['url'])
+                gevent.spawn(self.load_next_url, user, coll, rec, reqid)
+
             self.redis.expire('req_ttl:' + reqid, self.REQ_TIME)
 
         elif msg['ws_type'] == 'extract-resp':
@@ -97,17 +105,29 @@ class Automator(object):
                 self.check_done(user, coll, rec, msg['url'])
                 gevent.spawn(self.load_next_url, user, coll, rec, reqid)
 
-    def queue_new_url(self, user, coll, rec, url, force=False):
-        if not url.startswith('http://www.iana.org/') and not force:
-            return False
+    def should_extract_links(self, user, coll, rec, page_info):
+        auto_key = self.auto_key.format(user=user,
+                                        coll=coll,
+                                        rec=rec)
 
+        surt_scope = self.redis.hget(auto_key, 'surt_scope')
+        surt_scope = surt_scope or ''
+
+        surt = canonicalize(page_info['url'])
+
+        return surt.startswith(surt_scope)
+
+    def queue_new_url(self, user, coll, rec, url):
         existing_ts = self.manager._get_url_ts(user, coll, rec, url)
-        if existing_ts and not force:
+        if existing_ts:
+            logging.debug('Already captured: {0}'.format(url))
             return False
 
         q_key = self.q_key.format(user=user,
                                   coll=coll,
                                   rec=rec)
+
+        logging.debug('Queued {0} to {1}'.format(url, q_key))
         self.redis.sadd(q_key, url)
         return True
 
@@ -148,12 +168,14 @@ class Automator(object):
         while True:
             url = self.redis.spop(q_key)
             if not url:
+                logging.debug('No more urls from {0}'.format(q_key))
                 return False
 
             if self._do_load_url(user, coll, rec, url, reqid, qp_key):
+                logging.debug('Found pending url {0}'.format(qp_key))
                 return True
 
-    def _do_load_url(self, user, coll, rec, url, reqid, qp_key):
+    def is_queueable_url(self, user, coll, rec, url):
         existing_ts = self.manager._get_url_ts(user, coll, rec, url)
         if existing_ts:
             logging.debug('Skipping, already recorded: ' + url)
@@ -175,6 +197,9 @@ class Automator(object):
             logging.debug('Skipping, invalid url: ' + url)
             return False
 
+        return True
+
+    def _do_load_url(self, user, coll, rec, url, reqid, qp_key):
         logging.debug('Loading ({0}) Next: {1}'.format(reqid, url))
         self.redis.sadd(qp_key, url)
 
@@ -188,7 +213,7 @@ class Automator(object):
         channel = 'to_cbr_ps:' + reqid
         self.redis.publish(channel, json.dumps(msg))
 
-    def create_auto(self, user, coll, rec, browser):
+    def create_auto(self, user, coll, rec, browser, url):
         logging.debug('Creating Automation')
 
         if not self.manager.has_collection(user, coll):
@@ -206,11 +231,9 @@ class Automator(object):
                                         rec=rec)
 
         self.redis.hset(auto_key, 'browser', browser)
+        self.redis.hset(auto_key, 'surt_scope', canonicalize(url))
 
-        return auto_key
-
-        #if browser:
-        #    self.launch_browser(browser, auto_key, user, coll, rec)
+        return rec, auto_key
 
     def launch_browser(self, browser, auto_key, user, coll, rec):
         ts = timestamp_now()
@@ -223,7 +246,8 @@ class Automator(object):
                   'url': url,
                   'type': 'record',
                   'browser': browser,
-                  'can_write': True
+                  'browser_can_write': True,
+                  'ip': '',
                  }
 
         self.browser_mgr.fill_upstream_url(params, ts)
@@ -327,12 +351,11 @@ def main(debug=True):
     for key in a.redis.keys('c:ilya:test:*'):
         a.redis.delete(key)
 
-    #url = a.redis.spop('c:ilya:test:q:f')
-    #if not url:
-    #    url = 'http://www.vvork.com/'
-    auto_key = a.create_auto('ilya', 'test', 'auto', 'chrome:53')
+    url = 'http://example.com/'
 
-    a.queue_new_url('ilya', 'test', 'auto', 'http://example.com/', True)
+    rec, auto_key = a.create_auto('ilya', 'test', 'auto', 'chrome', url)
+
+    a.queue_new_url('ilya', 'test', rec, url)
 
     gevent.spawn(a.loop_msg)
 
