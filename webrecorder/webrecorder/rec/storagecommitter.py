@@ -43,6 +43,12 @@ class StorageCommitter(object):
 
             profile['remote_url_templ'] = s3_root
 
+        elif storage_type == 'f4':
+            f4_root = os.environ.get('F4_API_ROOT')
+            f4_root += config['storage_path_templ']
+
+            profile['remote_url_templ'] = f4_root
+
         return profile
 
     def is_locked(self, filename):
@@ -192,11 +198,13 @@ def run():
     print('Running storage committer {0}'.format(sleep_secs))
 
     from webrecorder.rec.s3 import S3Storage
+    from webrecorder.rec.f4 import F4Storage
 
     config = load_wr_config()
 
     storage_committer = StorageCommitter(config)
     storage_committer.add_storage_class('s3', S3Storage)
+    storage_committer.add_storage_class('f4', F4Storage)
 
     while True:
         try:

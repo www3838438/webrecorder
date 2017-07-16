@@ -113,6 +113,21 @@ services:
             - "maildomain=localhost"
             - "smtp_user=test:archive"
 
+    fcrepo:
+        image: cbeer/fcrepo4:4.7
+        expose:
+            - 8080
+
+        ports:
+            - 8100:8080
+
+        volumes:
+          - ./data/fedora:/data
+
+        environment:
+          - JAVA_OPTS=-Dfcrepo.modeshape.configuration="classpath:/config/file-simple/repository.json" -Dfcrepo.object.directory="/data/objects" -Dfcrepo.binary.directory="/data/binaries"
+
+
 networks:
     default:
         driver: bridge
