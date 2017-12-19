@@ -59,19 +59,18 @@ var archives = {{ get_archives() | tojson }};
     </div>
     {% endif %}
 
-    <div class="row">
-        <div id="news-alert" class='alert alert-info col-xs-6 col-xs-push-3' role="alert">
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-            <div class="wr-alert-logo">
-                <img src="/static/images/logo.png" alt="Webrecorder logo">
+
+    <div id="news-alert" class='alert alert-info' data-news-key="wr-hiring" role="alert">
+      <div class="alert-body">
+          <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+          <div class="wr-alert-info">
+            <span>🛠</span>
+            <div>
+              Want to make Webrecorder even better?<BR />
+              <a href="https://webrecorder.io/jobs/Webrecorder-Backend-Developer-Job.pdf" target="_blank">We’re hiring a Backend Developer</a>
             </div>
-            <div class="wr-alert-info">
-                <h5><strong>New!</strong> Browse your archives offline with Webrecorder Desktop Player App</h5>
-                <p>
-                    <a href="https://github.com/webrecorder/webrecorderplayer-electron/releases/latest" target="_blank">Download the desktop app&nbsp;&raquo;</a>
-                </p>
-            </div>
-        </div>
+          </div>
+      </div>
     </div>
 
     <div class="row" style="background-color:#F3F3F3 ; padding: 60px">
