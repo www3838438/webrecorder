@@ -7,7 +7,7 @@ import Table from 'react-virtualized/dist/commonjs/Table';
 import { Button, ControlLabel, FormControl, FormGroup } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 
-import { setSort } from 'redux/modules/collection';
+import { setSort } from 'store/modules/collection';
 import { getStorage, inStorage, setStorage, range } from 'helpers/utils';
 
 import SessionCollapsible from 'components/SessionCollapsible';

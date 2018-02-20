@@ -1,7 +1,7 @@
 import React from 'react';
 import { connect } from 'react-redux';
 
-import { getPageCount } from 'redux/selectors';
+import { getPageCount } from 'store/selectors';
 
 import { ToolBinUI } from 'components/controls';
 

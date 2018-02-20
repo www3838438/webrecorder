@@ -2,8 +2,8 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 
-import { addTo, create, deleteList, edit, load as loadList } from 'redux/modules/list';
-import { loadLists } from 'redux/modules/collection';
+import { addTo, create, deleteList, edit, load as loadList } from 'store/modules/list';
+import { loadLists } from 'store/modules/collection';
 
 import ListsUI from 'components/ListsUI';
 

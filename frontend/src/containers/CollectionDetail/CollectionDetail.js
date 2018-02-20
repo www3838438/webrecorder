@@ -4,10 +4,10 @@ import { asyncConnect } from 'redux-connect';
 import { createSearchAction } from 'redux-search';
 import { Map } from 'immutable';
 
-import { deleteCollection, load as loadColl } from 'redux/modules/collection';
-import { addTo, load as loadList, removeBookmark, saveSort } from 'redux/modules/list';
-import { isLoaded as isRBLoaded, load as loadRB } from 'redux/modules/remoteBrowsers';
-import { getOrderedPages, getOrderedRecordings, pageSearchResults } from 'redux/selectors';
+import { deleteCollection, load as loadColl } from 'store/modules/collection';
+import { addTo, load as loadList, removeBookmark, saveSort } from 'store/modules/list';
+import { isLoaded as isRBLoaded, load as loadRB } from 'store/modules/remoteBrowsers';
+import { getOrderedPages, getOrderedRecordings, pageSearchResults } from 'store/selectors';
 
 import CollectionDetailUI from 'components/CollectionDetailUI';
 

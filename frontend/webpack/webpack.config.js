@@ -29,8 +29,49 @@ const webpackConfig = {
         }
       },
       {
+        test: /\.(js|jsx)?$/,
+        exclude: /node_modules/,
+        loader: 'babel-loader'
+      },
+      {
+        test: /\.scss$/,
+        use: [
+          {
+            loader: 'style-loader'
+          },
+          {
+            loader: 'css-loader'
+          },
+          {
+            loader: 'postcss-loader',
+            options: {
+              plugins: () => {
+                return [
+                  autoprefixer({
+                    browsers: [
+                      '>1%',
+                      'last 4 versions',
+                      'Firefox ESR',
+                      'not ie < 9',
+                    ]
+                  })
+                ];
+              }
+            }
+          },
+          'sass-loader'
+        ]
+      },
+      {
         test: /\.css$/,
-        use: ['style-loader', 'css-loader']
+        use: [
+          {
+            loader: 'style-loader'
+          },
+          {
+            loader: 'css-loader'
+          }
+        ]
       },
       {
         test: /\.woff(\?v=\d+\.\d+\.\d+)?$/,

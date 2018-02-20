@@ -43,49 +43,14 @@ const devConfig = {
     main: [
       'react-hot-loader/patch',
       `webpack-hot-middleware/client?path=http://${host}:${port}/__webpack_hmr&quiet=true`,
-      './src/client.js',
       './config/polyfills',
-      'bootstrap-loader/extractStyles'
+      'bootstrap-loader/extractStyles',
+      './src/client.js'
     ]
   },
 
   output: {
     publicPath: `http://${host}:${port}/dist/`
-  },
-
-  module: {
-    rules: [
-      {
-        test: /\.(js|jsx)?$/,
-        exclude: /node_modules/,
-        loader: 'babel-loader'
-      },
-      {
-        test: /\.scss$/,
-        use: [
-          'style-loader',
-          'css-loader',
-          {
-            loader: 'postcss-loader',
-            options: {
-              plugins: () => {
-                return [
-                  autoprefixer({
-                    browsers: [
-                      '>1%',
-                      'last 4 versions',
-                      'Firefox ESR',
-                      'not ie < 9',
-                    ]
-                  })
-                ];
-              }
-            }
-          },
-          'sass-loader'
-        ]
-      }
-    ]
   },
 
   plugins: [
@@ -96,7 +61,7 @@ const devConfig = {
       __DEVELOPMENT__: true,
       __DEVTOOLS__: true,
       __PLAYER__: false
-    }),
+    })
   ]
 };
 
