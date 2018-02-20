@@ -1,6 +1,3 @@
-/* eslint-disable */
-require('babel-polyfill');
-
 // Webpack config for creating the production bundle.
 var autoprefixer = require('autoprefixer');
 var fs = require('fs');
@@ -28,7 +25,6 @@ module.exports = {
       './config/polyfills',
       'bootstrap-loader/extractStyles',
       './src/client.js'
-      //'./src/shared/js/wb_frame.js', //'./src/shared/js/wb.js',
     ]
   },
   output: {
@@ -50,29 +46,29 @@ module.exports = {
       {
         test: /\.scss$/,
         use: ExtractTextPlugin.extract({
-            fallback: 'style-loader',
-            use: [
-              'css-loader',
-              {
-                loader: 'postcss-loader',
-                options: {
-                  plugins: function (){
-                    return [
-                      autoprefixer({
-                        browsers: [
-                          '>1%',
-                          'last 4 versions',
-                          'Firefox ESR',
-                          'not ie < 9',
-                        ]
-                      })
-                    ]
-                  }
+          fallback: 'style-loader',
+          use: [
+            'css-loader',
+            {
+              loader: 'postcss-loader',
+              options: {
+                plugins: function () {
+                  return [
+                    autoprefixer({
+                      browsers: [
+                        '>1%',
+                        'last 4 versions',
+                        'Firefox ESR',
+                        'not ie < 9',
+                      ]
+                    })
+                  ]
                 }
-              },
-              'sass-loader',
-            ]
-          })
+              }
+            },
+            'sass-loader',
+          ]
+        })
       },
       {
         test: /\.css$/,

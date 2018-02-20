@@ -4,12 +4,12 @@ import { asyncConnect } from 'redux-connect';
 
 import config from 'config';
 
-import { isLoaded, load as loadColl } from 'redux/modules/collection';
-import { getArchives, setExtractable, updateUrlAndTimestamp } from 'redux/modules/controls';
-import { resetStats } from 'redux/modules/infoStats';
-import { load as loadBrowsers, setBrowser } from 'redux/modules/remoteBrowsers';
-import { getActiveCollection } from 'redux/selectors';
-import { selectCollection } from 'redux/modules/user';
+import { isLoaded, load as loadColl } from 'store/modules/collection';
+import { getArchives, setExtractable, updateUrlAndTimestamp } from 'store/modules/controls';
+import { resetStats } from 'store/modules/infoStats';
+import { load as loadBrowsers, setBrowser } from 'store/modules/remoteBrowsers';
+import { selectCollection } from 'store/modules/user';
+import { getActiveCollection } from 'store/selectors';
 
 import { RemoteBrowser } from 'containers';
 import { IFrame, ReplayUI } from 'components/controls';

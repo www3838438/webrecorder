@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 
 import WebSocketHandler from 'helpers/ws';
 import { deleteStorage, getStorage, setStorage } from 'helpers/utils';
-import { createRemoteBrowser } from 'redux/modules/remoteBrowsers';
+import { createRemoteBrowser } from 'store/modules/remoteBrowsers';
 
 import CBrowser from 'shared/js/browser_controller';
 

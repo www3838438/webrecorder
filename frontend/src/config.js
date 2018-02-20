@@ -1,6 +1,3 @@
-/* eslint-disable */
-require('babel-polyfill');
-
 /**
  * For local settings override, create `config.local.js` in the same directory
  * as this file..
@@ -29,7 +26,7 @@ const appHost = process.env.APP_HOST ? process.env.APP_HOST : `localhost:8089`;
 const contentHost = process.env.CONTENT_HOST ? process.env.CONTENT_HOST : `localhost:8092`;
 
 
-module.exports = Object.assign({
+export default Object.assign({
   apiProxy: false,
   port: process.env.FRONTEND_PORT || 8095,
   appHost: `http://${appHost}`,

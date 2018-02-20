@@ -3,8 +3,8 @@ import { asyncConnect } from 'redux-connect';
 
 import { isLoaded as areCollsLoaded,
          load as loadCollections,
-         createCollection } from 'redux/modules/collections';
-import { sortCollsByCreatedAt } from 'redux/selectors';
+         createCollection } from 'store/modules/collections';
+import { sortCollsByCreatedAt } from 'store/selectors';
 
 import CollectionListUI from 'components/CollectionListUI';
 

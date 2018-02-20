@@ -1,7 +1,7 @@
 import React from 'react';
 import { connect } from 'react-redux';
 
-import { toggleToolBin } from 'redux/modules/toolBin';
+import { toggleToolBin } from 'store/modules/toolBin';
 
 import { RecordingToolsUI } from 'components/controls';
 

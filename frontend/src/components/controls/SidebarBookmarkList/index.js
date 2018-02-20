@@ -7,7 +7,7 @@ import Table from 'react-virtualized/dist/commonjs/Table';
 
 import { untitledEntry } from 'config';
 
-import { updateUrlAndTimestamp } from 'redux/modules/controls';
+import { updateUrlAndTimestamp } from 'store/modules/controls';
 
 import { Collection } from 'components/icons';
 import Searchbox from 'components/Searchbox';

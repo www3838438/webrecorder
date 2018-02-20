@@ -1,9 +1,9 @@
 import React from 'react';
 import { connect } from 'react-redux';
 
-import { createCollection } from 'redux/modules/collections';
-import { load as loadUser, selectCollection } from 'redux/modules/user';
-import { getActiveCollection } from 'redux/selectors';
+import { createCollection } from 'store/modules/collections';
+import { load as loadUser, selectCollection } from 'store/modules/user';
+import { getActiveCollection } from 'store/selectors';
 import CollectionDropdownUI from 'components/CollectionDropdownUI';
 
 

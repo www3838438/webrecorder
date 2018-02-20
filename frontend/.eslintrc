@@ -77,7 +77,6 @@
     "__DEVTOOLS__": true,
     "__PLAYER__": true,
     "socket": true,
-    "webpackIsomorphicTools": true,
     "expect": true
   }
 }

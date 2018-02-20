@@ -1,7 +1,7 @@
 import React from 'react';
 import { connect } from 'react-redux';
 
-import { getActiveCollection } from 'redux/selectors';
+import { getActiveCollection } from 'store/selectors';
 
 import { StandaloneRecorderUI } from 'components/controls';
 

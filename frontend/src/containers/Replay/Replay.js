@@ -6,11 +6,11 @@ import { asyncConnect } from 'redux-connect';
 import { remoteBrowserMod, truncate } from 'helpers/utils';
 import config from 'config';
 
-import { getRecording } from 'redux/selectors';
-import { isLoaded, load as loadColl } from 'redux/modules/collection';
-import { getArchives, updateUrl, updateUrlAndTimestamp } from 'redux/modules/controls';
-import { resetStats } from 'redux/modules/infoStats';
-import { createRemoteBrowser, load as loadBrowsers, setBrowser } from 'redux/modules/remoteBrowsers';
+import { getRecording } from 'store/selectors';
+import { isLoaded, load as loadColl } from 'store/modules/collection';
+import { getArchives, updateUrl, updateUrlAndTimestamp } from 'store/modules/controls';
+import { resetStats } from 'store/modules/infoStats';
+import { createRemoteBrowser, load as loadBrowsers, setBrowser } from 'store/modules/remoteBrowsers';
 
 import { RemoteBrowser, Sidebar } from 'containers';
 import { IFrame, ReplayUI } from 'components/controls';

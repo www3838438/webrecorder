@@ -4,10 +4,10 @@ import PropTypes from 'prop-types';
 import ContentFrame from 'shared/js/wb_frame';
 import WebSocketHandler from 'helpers/ws';
 import config from 'config';
-import { updateTimestamp, updateUrl } from 'redux/modules/controls';
+import { updateTimestamp, updateUrl } from 'store/modules/controls';
 
 import { setTitle } from 'helpers/utils';
-import { showModal } from 'redux/modules/bugReport';
+import { showModal } from 'store/modules/bugReport';
 
 import './style.scss';
 

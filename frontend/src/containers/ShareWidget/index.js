@@ -3,8 +3,8 @@ import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 
 import { remoteBrowserMod } from 'helpers/utils';
-import { setPublic } from 'redux/modules/collection';
-import { showModal } from 'redux/modules/userLogin';
+import { setPublic } from 'store/modules/collection';
+import { showModal } from 'store/modules/userLogin';
 
 import { ShareWidgetUI } from 'components/controls';
 

@@ -1,11 +1,11 @@
 import React from 'react';
 import { asyncConnect } from 'redux-connect';
 
-import { isLoaded as isAuthLoaded } from 'redux/modules/auth';
+import { isLoaded as isAuthLoaded } from 'store/modules/auth';
 import { load as loadUser,
          isLoaded as isUserLoaded,
          updatePassword,
-         deleteUser } from 'redux/modules/user';
+         deleteUser } from 'store/modules/user';
 
 import { UserSettingsUI } from 'components/siteComponents';
 

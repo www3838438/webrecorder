@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 
-import { closeModal, reportBug, showModal } from 'redux/modules/bugReport';
+import { closeModal, reportBug, showModal } from 'store/modules/bugReport';
 
 import { BugReportUI } from 'components/controls';
 

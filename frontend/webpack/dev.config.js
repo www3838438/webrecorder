@@ -7,8 +7,13 @@ var path = require('path');
 var webpack = require('webpack');
 var assetsPath = path.resolve(__dirname, '../static/dist');
 
+<<<<<<< HEAD
 const host = process.env.APP_HOST || '127.0.0.1';
 const port = (Number(process.env.PORT) + 1) || 8096;
+=======
+const host = '127.0.0.1';
+const port = (Number(process.env.FRONTEND_PORT) + 1) || 8096;
+>>>>>>> Work towrads webpack-universal
 
 // https://github.com/halt-hammerzeit/webpack-isomorphic-tools
 var WebpackIsomorphicToolsPlugin = require('webpack-isomorphic-tools/plugin');
@@ -46,7 +51,6 @@ var webpackConfig = module.exports = {
   context: path.resolve(__dirname, '..'),
   entry: {
     'main': [
-      'babel-polyfill',
       'react-hot-loader/patch',
       'webpack-hot-middleware/client?path=http://' + host + ':' + port + '/__webpack_hmr&quiet=true',
       './config/polyfills',
@@ -152,7 +156,7 @@ var webpackConfig = module.exports = {
   },
   resolve: {
     modules: [
-      'src',
+      path.resolve(__dirname, "src"),
       'node_modules'
     ],
     extensions: ['.json', '.js']

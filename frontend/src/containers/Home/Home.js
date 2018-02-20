@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { Collapse } from 'react-bootstrap';
 
-import { showModal } from 'redux/modules/userLogin';
+import { showModal } from 'store/modules/userLogin';
 
 import { HomepageAnnouncement, HomepageMessage } from 'components/siteComponents';
 import { StandaloneRecorder } from 'containers';
