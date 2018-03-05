@@ -136,13 +136,12 @@ const webpackConfig = {
   },
 
   plugins: [
-    new webpack.IgnorePlugin(/webpack-stats\.json$/),
     new HardSourceWebpackPlugin(),
     new webpack.EnvironmentPlugin([
-      'NODE_ENV',
-      'APP_HOST',
-      'FRONTEND_PORT',
-      'CONTENT_HOST'
+      'NODE_ENV': 'development',
+      'APP_HOST': null,
+      'FRONTEND_PORT': 8095,
+      'CONTENT_HOST': 8092
     ])
   ]
 };
