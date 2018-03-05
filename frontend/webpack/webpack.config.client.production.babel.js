@@ -1,12 +1,9 @@
-import autoprefixer from 'autoprefixer';
 import path from 'path';
 import webpack from 'webpack';
 import merge from 'webpack-merge';
 
 import ExtractTextPlugin from 'extract-text-webpack-plugin';
 import CleanPlugin from 'clean-webpack-plugin';
-import StripLoader from 'strip-loader';
-import HardSourceWebpackPlugin from 'hard-source-webpack-plugin';
 
 import getBaseConfig from './webpack.config.client';
 
@@ -27,13 +24,12 @@ const prodConfig = {
 
   output: {
     filename: '[name]-[chunkhash].js',
-    publicPath: '/dist/'
+    publicPath: '/static/'
   },
 
   plugins: [
     new CleanPlugin([assetsPath], { root: projectRootPath }),
 
-    // css files from the extract-text-plugin loader
     new ExtractTextPlugin({
       filename: '[name]-[chunkhash].css',
       allChunks: true
@@ -51,7 +47,7 @@ const prodConfig = {
     new webpack.optimize.UglifyJsPlugin({
       compress: {
         unused: true,
-        warnings: true,
+        warnings: false,
         dead_code: true,
         drop_console: true
       }

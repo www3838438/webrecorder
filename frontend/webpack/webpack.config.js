@@ -1,5 +1,4 @@
 const autoprefixer = require('autoprefixer');
-const fs = require('fs');
 const path = require('path');
 const webpack = require('webpack');
 const HardSourceWebpackPlugin = require('hard-source-webpack-plugin');
@@ -12,7 +11,7 @@ const webpackConfig = {
 
   output: {
     path: assetsPath,
-    publicPath: '/dist/',
+    publicPath: '/static/',
     filename: '[name]-[hash].js',
     chunkFilename: '[name]-[chunkhash].js'
   },

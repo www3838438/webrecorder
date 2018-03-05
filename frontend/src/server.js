@@ -30,9 +30,6 @@ const bypassUrls = [
 ];
 
 export default function (parameters) {
-  // TODO: use nginx
-  app.use(express.static(path.resolve(__dirname, '..')));
-
   // proxy api and other urls on localhost
   if (config.apiProxy) {
     // Proxy client API requets to server for now to avoid CORS

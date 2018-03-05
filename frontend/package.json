@@ -102,13 +102,7 @@
     "analyze": "NODE_ENV=\"production\" webpack --config ./webpack/webpack.config.client.production.babel.js --json | webpack-bundle-size-analyzer",
     "stats": "NODE_ENV=\"production\" webpack --config ./webpack/webpack.config.client.production.babel.js --json --profile > stats.json",
     "delay": "node ./node_modules/npm-delay 15000",
-    "dev": "run-p dev:client:build dev:server:prepare dev:server:build dev:server:delay",
-    "dev:client:build": "better-npm-run build-client-local",
     "dev:server:prepare": "universal-webpack --settings ./webpack/universal-webpack-settings.json prepare",
-    "dev:server:build": "better-npm-run dev:server:build-local",
-    "dev:server:delay": "run-s delay dev:server:start",
-    "dev:server:start": "better-npm-run start-dev",
-    "build-client-local": "better-npm-run build-client-local",
     "docker-dev": "run-p docker-dev:client:build dev:server:prepare docker-dev:server:build docker-dev:server:delay",
     "docker-dev:client:build": "better-npm-run build-client",
     "docker-dev:server:build": "better-npm-run dev:server:build",
@@ -129,32 +123,10 @@
         "NODE_ENV": "production"
       }
     },
-    "dev:server:build-local": {
-      "command": "webpack --config ./webpack/webpack.config.server.development.babel.js --watch --colors --display-error-details",
-      "env": {
-        "NODE_ENV": "development",
-        "FRONTEND_PORT": 8095,
-        "APP_HOST": "localhost:8095",
-        "CONTENT_HOST": "localhost:8092",
-        "INTERNAL_HOST": "localhost",
-        "INTERNAL_PORT": 8089
-      }
-    },
     "dev:server:build": {
       "command": "webpack --config ./webpack/webpack.config.server.development.babel.js --watch --colors --display-error-details",
       "env": {
         "NODE_ENV": "development"
-      }
-    },
-    "start-dev": {
-      "command": "nodemon ./bin/server.babel.js --watch ./static",
-      "env": {
-        "NODE_PATH": "./src",
-        "NODE_ENV": "development",
-        "FRONTEND_PORT": 8095,
-        "CONTENT_HOST": "localhost:8092",
-        "INTERNAL_HOST": "localhost",
-        "INTERNAL_PORT": 8089
       }
     },
     "start-docker-dev": {
@@ -167,16 +139,6 @@
       "command": "node ./bin/server.babel.js",
       "env": {
         "NODE_PATH": "./src"
-      }
-    },
-    "build-client-local": {
-      "command": "babel-node webpack/webpack-dev-server.js",
-      "env": {
-        "NODE_ENV": "development",
-        "UV_THREADPOOL_SIZE": 100,
-        "NODE_PATH": "./src",
-        "FRONTEND_PORT": 8095,
-        "CONTENT_HOST": "localhost:8092"
       }
     },
     "build-client": {

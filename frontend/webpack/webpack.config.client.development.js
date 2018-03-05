@@ -50,7 +50,7 @@ const devConfig = {
   },
 
   output: {
-    publicPath: `http://${host}:${port}/dist/`
+    publicPath: `http://${host}:${port}${baseConfig.output.publicPath}`
   },
 
   plugins: [

@@ -9,7 +9,7 @@ const assetPort = Number(port) + 1;
 
 const config = {
   output: {
-    publicPath: `http://${host}:${assetPort}/dist/`
+    publicPath: `http://${host}:${assetPort}${baseConfig.output.publicPath}`
   },
 
   plugins: [
