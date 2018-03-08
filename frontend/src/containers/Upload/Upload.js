@@ -1,7 +1,7 @@
-import React, { Component } from 'react';
+import React from 'react';
 import { connect } from 'react-redux';
 
-import { selectCollection } from 'redux/modules/user';
+import { selectCollection } from 'store/modules/user';
 
 import { UploadUI } from 'components/siteComponents';
 
