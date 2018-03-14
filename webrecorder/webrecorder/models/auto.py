@@ -40,7 +40,7 @@ class Auto(RedisUniqueComponent):
                      'owner': collection.my_id,
                      'user': collection.get_owner().name,
                      'coll_name': collection.name,
-                     'rec': ''
+                     'rec': '',
 
                      'browser': 'chrome:60',
                      'request_ts': '',
