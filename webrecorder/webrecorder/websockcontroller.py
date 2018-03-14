@@ -73,8 +73,8 @@ class WebsockController(BaseController):
         user = info['user']
         coll = info['coll']
         rec = info['rec']
-        rec_name = info['rec_name']
-        coll_name = info['coll_name']
+        rec_name = info.get('rec_name', '')
+        coll_name = info.get('coll_name', '')
 
         user = self.user_manager.all_users.get_user(user)
         collection = user.get_collection_by_id(coll, coll_name)

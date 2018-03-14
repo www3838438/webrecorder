@@ -9,6 +9,7 @@ from webrecorder.utils import redis_pipeline
 
 from webrecorder.models.base import RedisNamedContainer, RedisOrderedListMixin
 from webrecorder.models.recording import Recording
+from webrecorder.models.auto import Auto
 from webrecorder.models.list_bookmarks import BookmarkList
 
 
@@ -51,6 +52,30 @@ class Collection(RedisOrderedListMixin, RedisNamedContainer):
         self.add_object(rec_name, recording, owner=True)
 
         return recording
+
+    def create_auto(self, props=None):
+        self.access.assert_can_admin_coll(self)
+
+        auto = Auto(redis=self.redis,
+                    access=self.access)
+
+        aid = auto.init_new(self, props)
+        return aid
+
+    def get_auto(self, aid):
+        if not self.access.can_admin_coll(self):
+            return None
+
+        auto = Auto(my_id=aid,
+                    redis=self.redis,
+                    access=self.access)
+
+        if auto['owner'] != self.my_id:
+            return None
+
+        auto.owner = self
+
+        return auto
 
     def create_bookmark_list(self, props):
         self.access.assert_can_write_coll(self)
@@ -343,4 +368,4 @@ class Collection(RedisOrderedListMixin, RedisNamedContainer):
 # ============================================================================
 Recording.OWNER_CLS = Collection
 BookmarkList.OWNER_CLS = Collection
-
+Auto.OWNER_CLS = Collection

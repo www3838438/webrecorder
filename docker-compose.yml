@@ -1,6 +1,23 @@
 version: '2'
 
 services:
+    auto:
+        build: ./webrecorder
+        command: python -m webrecorder.models.auto_manager
+
+        env_file:
+            - ./wr.env
+
+        depends_on:
+            - app
+
+        volumes:
+            - ./webrecorder/:/code/
+
+        networks:
+            - default
+            - browsers
+ 
     app:
         build: ./webrecorder
         command: uwsgi /code/apps/apiapp.ini
