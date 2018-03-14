@@ -34,7 +34,7 @@ class Auto(RedisUniqueComponent):
 
         aid = self._create_new_id()
 
-        self.data = {'max_browsers': '2',
+        self.data = {'max_browsers': '1',
                      'status': self.INACTIVE,
 
                      'owner': collection.my_id,
@@ -63,7 +63,7 @@ class Auto(RedisUniqueComponent):
         recording = collection.create_recording(rec_type='auto')
 
         self['rec'] = recording.my_id
-        self['status'] = self.RUNNING
+        self['status'] = self.READY
 
     def queue_list(self, list_id):
         if self['status'] not in (self.INACTIVE, self.RUNNING):
@@ -79,7 +79,7 @@ class Auto(RedisUniqueComponent):
 
         for bookmark in blist.get_bookmarks():
             url_req = {'url': bookmark['url']}
-            logging.debug('Queuing: ' + str(url_req))
+            print('Queuing: ' + str(url_req))
             self.redis.rpush(self.browser_q, json.dumps(url_req))
 
         return None

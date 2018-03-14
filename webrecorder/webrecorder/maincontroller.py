@@ -31,6 +31,7 @@ from webrecorder.usercontroller import UserController
 from webrecorder.downloadcontroller import DownloadController
 from webrecorder.uploadcontroller import UploadController
 from webrecorder.appcontroller import AppController
+from webrecorder.autocontroller import AutoController
 
 from webrecorder.browsermanager import BrowserManager
 
@@ -61,6 +62,7 @@ class MainController(BaseController):
                        RecsController,
                        CollsController,
                        ListsController,
+                       AutoController,
                       ]
 
 

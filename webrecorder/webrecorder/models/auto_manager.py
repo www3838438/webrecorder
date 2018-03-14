@@ -1,3 +1,5 @@
+from gevent import monkey; monkey.patch_all()
+
 import os
 import redis
 import time
@@ -9,10 +11,13 @@ import websocket
 
 from webrecorder.utils import init_logging
 
+from warcio.timeutils import timestamp_now
+
 from webrecorder.models.auto import Auto
+from webrecorder.models.recording import Recording
+from webrecorder.models.usermanager import CLIUserManager
 
 from webrecorder.browsermanager import BrowserManager
-from webrecorder.models.usermanager import CLIUserManager
 
 
 # ============================================================================
@@ -24,15 +29,16 @@ class AutoManager(object):
         self.redis = self.user_manager.redis
 
         browser_redis = redis.StrictRedis.from_url(os.environ['REDIS_BROWSER_URL'],
-                                                        decode_responses=True)
+                                                   decode_responses=True)
 
         self.browser_mgr = BrowserManager(self.config, browser_redis, self.user_manager)
 
-        self.autos = []
+        self.autos = {}
         self.init_autos()
 
     def init_autos(self):
-        for auto_key in self.redis.scan_iter(Auto.INFO_KEY.format('*')):
+        logging.debug('AutoManager Start...')
+        for auto_key in self.redis.scan_iter(Auto.INFO_KEY.format(auto='*')):
             aid = auto_key.split(':')[1]
             self.init_auto(aid)
 
@@ -42,16 +48,15 @@ class AutoManager(object):
 
         logging.debug('Adding auto for processing: ' + str(aid))
 
-        auto.init_browsers()
-
-        self.autos.append(auto)
+        if auto.my_id not in self.autos:
+            self.autos[auto.my_id] = auto
 
     def run(self):
         while True:
             self.process_adds()
             self.process_dels()
 
-            for auto in self.autos:
+            for n, auto in self.autos.items():
                 auto.process()
 
             time.sleep(10.0)
@@ -70,14 +75,15 @@ class AutoManager(object):
             if not aid:
                 break
 
-            for auto in self.autos:
-                if auto.my_id == aid:
-                    self.autos.pop(auto, None)
+            for n, auto in self.autos.items():
+                if n == aid:
+                    auto.close()
+                    self.autos.pop(aid, None)
                     break
 
     @classmethod
-    def main():
-        init_logging()
+    def main(cls):
+        init_logging(debug=True)
 
         auto_mgr = AutoManager()
         auto_mgr.run()
@@ -92,12 +98,23 @@ class RunnableAuto(Auto):
 
         super(RunnableAuto, self).__init__(**kwargs)
 
+        self.browsers = []
         self.cdata = {}
         self.br_key = self.BR_KEY.format(auto=self.my_id)
 
+        if self['status'] != self.RUNNING and self['status'] != self.READY:
+            logging.debug('Automation {0} not ready or running'.format(self.my_id))
+            return
+
+        self.init_browsers()
+
+    def close(self):
+        for browser in self.browsers:
+            browser.close()
+
     def make_new_browser(self, reqid=None):
         browser = AutoBrowser(auto=self, reqid=reqid,
-                              cdata=self.shared_data)
+                              cdata=self.cdata)
 
         self.browsers.append(browser)
         return browser
@@ -117,14 +134,11 @@ class RunnableAuto(Auto):
                      }
 
         self.browsers = []
-
-        if self['status'] != self.RUNNING:
-            logging.debug('Automation {0} not running'.format(self.my_id))
-            return
-
         active_reqids = self.redis.smembers(self.br_key)
 
         max_browsers = int(self['max_browsers'])
+
+        self['status'] = self.RUNNING
 
         for reqid, count in zip(active_reqids, range(max_browsers)):
             if not self.make_new_browser(reqid):
@@ -135,6 +149,16 @@ class RunnableAuto(Auto):
                 return
 
     def process(self):
+        if self['status'] == self.READY:
+            self.init_browsers()
+
+        if self['status'] != self.RUNNING:
+            return
+
+        logging.debug('Auto Running: ' + self.my_id)
+
+        max_browsers = int(self['max_browsers'])
+
         while len(self.browsers) > max_browsers:
             browser = self.browsers.pop()
             browser.close()
@@ -151,7 +175,11 @@ class RunnableAuto(Auto):
         self.redis.sadd(self.br_key, reqid)
 
     def browser_removed(self, reqid):
-        self.redis.srem(self.br_key, reqid)
+        if reqid:
+            self.redis.srem(self.br_key, reqid)
+
+    def __getitem__(self, name):
+        return self.get_prop(name, force_update=True)
 
 
 # ============================================================================
@@ -177,13 +205,13 @@ class AutoBrowser(object):
 
         logging.debug('Auto Browser Inited: ' + self.reqid)
 
-        gevent.spawn(self.recv_loop)
-
     def reinit(self):
         if self.running:
             return
 
         self.init_with_reqid()
+
+        logging.debug('Auto Browser Re-Inited: ' + self.reqid)
 
     def init_with_reqid(self, reqid=None):
         ip = None
@@ -210,6 +238,7 @@ class AutoBrowser(object):
         self.auto.browser_added(reqid)
 
         self.init_tab_conn()
+        gevent.spawn(self.recv_loop)
 
     def find_browser_tab(self, ip, url=None):
         try:
@@ -263,12 +292,14 @@ class AutoBrowser(object):
 
     def init_tab_conn(self):
         try:
-            self.tab_ws = websocket.create_connection(tab['webSocketDebuggerUrl'])
+            self.tab_ws = websocket.create_connection(self.tab['webSocketDebuggerUrl'])
 
-            self.id_count = 1
+            self.id_count = 0
+            self.frame_id = ''
+            self.curr_mime = ''
 
             self.send_ws({"method": "Page.enable"})
-            logging.debug('Page.enable on ' + tab['webSocketDebuggerUrl'])
+            logging.debug('Page.enable on ' + self.tab['webSocketDebuggerUrl'])
 
             self.running = True
 
@@ -281,13 +312,16 @@ class AutoBrowser(object):
 
     def queue_next(self):
         def wait_queue():
-            name, url_req = self.redis.blpop(self.browser_q)
-            url_req = json.loads(url_req)
+            name, url_req_data = self.redis.blpop(self.browser_q)
+            url_req = json.loads(url_req_data)
 
             self.curr_url_req = url_req
 
-            logging.debug('Queuing Next: ' + str(url_req))
-            self.send_ws({"method": "Page.navigate", "params": {"url": url_req['url']}})
+            try:
+                logging.debug('Queuing Next: ' + str(url_req))
+                self.send_ws({"method": "Page.navigate", "params": {"url": url_req['url']}})
+            except:
+                self.redis.rpush(self.browser_q, url_req_data)
 
         gevent.spawn(wait_queue)
 
@@ -296,24 +330,87 @@ class AutoBrowser(object):
             while self.running:
                 resp = self.tab_ws.recv()
                 resp = json.loads(resp)
-                if resp.get('method') == 'Page.frameStoppedLoading':
-                    self.queue_next()
+
+                try:
+                    if resp.get('id') == self.id_count and 'result' in resp:
+                        self.handle_result(resp)
+
+                    elif resp.get('method') == 'Page.frameNavigated':
+                        self.handle_frameNavigated(resp)
+
+                    elif resp.get('method') == 'Page.frameStoppedLoading':
+                        self.handle_frameStoppedLoading(resp)
+                except Exception as re:
+                    logging.warn('*** Error handling response')
+                    logging.warn(str(re))
 
                 logging.debug(str(resp))
         except Exception as e:
-            logging.debug(str(e))
+            logging.warn(str(e))
 
         finally:
             self.close()
 
+    def handle_result(self, resp):
+        result = resp['result']
+        frame_id = result.get('frameId')
+        if frame_id:
+            self.frame_id = frame_id
+
+    def handle_frameStoppedLoading(self, resp):
+        frame_id = resp['params']['frameId']
+
+        # ensure top-frame stopped loading
+        if frame_id != self.frame_id:
+            return
+
+        self.queue_next()
+
+    def handle_frameNavigated(self, resp):
+        frame = resp['params']['frame']
+
+        # ensure target frame
+        if frame['id'] != self.frame_id:
+            return
+
+        # if not top frame, skip
+        if frame.get('parentId'):
+            return
+
+        self.curr_mime = frame['mimeType']
+
+        # if text/html, already should have been added
+        if self.curr_mime != 'text/html':
+            recording = Recording(my_id=self.cdata['rec'],
+                                  redis=self.redis,
+                                  access=self.auto.auto_mgr.user_manager.access)
+
+            page = {'url': frame['url'],
+                    'title': frame['url'],
+                    'timestamp': self.cdata['request_ts'] or timestamp_now(),
+                    'browser': self.cdata['browser'],
+                   }
+
+            recording.add_page(page, False)
+
     def send_ws(self, data):
-        data['id'] = self.id_count
         self.id_count += 1
+        data['id'] = self.id_count
         self.tab_ws.send(json.dumps(data))
 
     def close(self):
         self.running = False
         self.auto.browser_removed(self.reqid)
+        self.reqid = None
+
+        try:
+            if self.tab_ws:
+                self.tab_ws.close()
+        except:
+            pass
+
+        finally:
+            self.tab_ws = None
 
 
 # ============================================================================

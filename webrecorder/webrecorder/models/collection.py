@@ -25,6 +25,8 @@ class Collection(RedisOrderedListMixin, RedisNamedContainer):
 
     ORDERED_LIST_KEY = 'c:{coll}:lists'
 
+    AUTO_KEY = 'c:{coll}:autos'
+
     COLL_CDXJ_KEY = 'c:{coll}:cdxj'
     COLL_CDXJ_TTL = 1800
 
@@ -60,6 +62,9 @@ class Collection(RedisOrderedListMixin, RedisNamedContainer):
                     access=self.access)
 
         aid = auto.init_new(self, props)
+
+        self.redis.sadd(self.AUTO_KEY.format(coll=self.my_id), aid)
+
         return aid
 
     def get_auto(self, aid):
@@ -76,6 +81,19 @@ class Collection(RedisOrderedListMixin, RedisNamedContainer):
         auto.owner = self
 
         return auto
+
+    def get_autos(self):
+        return [self.get_auto(aid) for aid in self.redis.smembers(self.AUTO_KEY.format(coll=self.my_id))]
+
+    def remove_auto(self, auto):
+        self.access.assert_can_admin_coll(self)
+
+        count = self.redis.srem(self.AUTO_KEY.format(coll=self.my_id))
+
+        if not count:
+            return False
+
+        return auto.delete_me()
 
     def create_bookmark_list(self, props):
         self.access.assert_can_write_coll(self)
@@ -289,6 +307,10 @@ class Collection(RedisOrderedListMixin, RedisNamedContainer):
 
         for blist in self.get_lists(load=False):
             blist.delete_me()
+
+        for auto in self.get_autos():
+            if auto:
+                auto.delete_me()
 
         return self.delete_object()
 

@@ -9,15 +9,16 @@ class AutoController(BaseController):
 
         # CREATE AUTO
         @self.app.post('/api/v1/auto')
-        def create_auto(self):
+        def create_auto():
             user, collection = self.load_user_coll()
 
             aid = collection.create_auto()
 
+            return {'auto': aid}
 
         # QUEUE LIST + START
         @self.app.post('/api/v1/auto/<aid>/queue_list')
-        def add_lists(self, aid):
+        def add_lists(aid):
             user, collection, auto = self.load_user_coll_auto(aid)
 
             list_id = request.json['list']
@@ -29,13 +30,21 @@ class AutoController(BaseController):
             auto.start()
             return {'status': auto['status']}
 
+        # DELETE AUTO
+        @self.app.delete('/api/v1/auto/<aid>')
+        def delete_auto(aid):
+            user, collection, auto = self.load_user_coll_auto(aid)
+
+            auto.delete_me()
+
+            return {'deleted_id': auto.my_id}
 
     def load_user_coll_auto(self, aid, user=None, coll_name=None):
         user, collection = self.load_user_coll(user=user, coll_name=coll_name)
 
         return user, collection, self.load_auto(collection, aid)
 
-    def load_list(self, collection, aid):
+    def load_auto(self, collection, aid):
         auto = collection.get_auto(aid)
         if not auto:
             self._raise_error(404, 'Automation not found', api=True,
