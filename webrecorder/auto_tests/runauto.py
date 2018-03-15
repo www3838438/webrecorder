@@ -53,7 +53,8 @@ class TestAuto(object):
         TestAuto.LIST_ID = res.json()['list']['id']
 
     def test_add_bookmarks(self):
-        bookmarks = [{'url': 'http://example.com/', 'title': 'Example Com'},
+        bookmarks = [
+                     {'url': 'http://example.com/', 'title': 'Example Com'},
                      {'url': 'http://iana.org/', 'title': 'IANA'},
                      {'url': 'https://eligrey.com/', 'title': 'XHTML'},
                      {'url': 'https://twitter.com/webrecorder_io', 'title': 'Twitter'},

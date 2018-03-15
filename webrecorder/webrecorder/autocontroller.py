@@ -12,7 +12,7 @@ class AutoController(BaseController):
         def create_auto():
             user, collection = self.load_user_coll()
 
-            aid = collection.create_auto()
+            aid = collection.create_auto(request.json)
 
             return {'auto': aid}
 

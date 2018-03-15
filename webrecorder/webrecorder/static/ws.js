@@ -115,6 +115,37 @@
         return sendMsg(msg);
     }
 
+    function sendLinks(links) {
+        var msg = {"ws_type": "extract-resp"};
+
+        msg.phase = "start";
+        sendMsg(msg);
+
+        msg.phase = "url";
+
+        for (var i = 0; i < links.length; i++) {
+            msg.url = links[i];
+            sendMsg(msg);
+        }
+
+        doneLoop();
+        setInterval(doneLoop, 10000);
+    }
+
+    function doneLoop() {
+        var msg = {"ws_type": "extract-resp"};
+
+        msg.phase = "end";
+
+        if (window.wbinfo) {
+            msg.url = window.wbinfo.url;
+        } else {
+            msg.url = document.location.href;
+        }
+
+        return sendMsg(msg);
+    }
+
     function sendMsg(msg) {
         if (!hasWS()) {
             return false;
@@ -134,7 +165,11 @@
 
             case "set_url":
                 if (!document.hidden && msg.url != window.location.href) {
-                    window.location.href = msg.url;
+                    if (msg["new"]) {
+                        window.open(msg.url);
+                    } else {
+                        window.location.href = msg.url;
+                    }
                 }
                 break;
 
@@ -158,10 +193,8 @@
                 }
                 break;
 
-            case "load_all":
-                if (!document.hidden) {
-                    load_all_links();
-                }
+            case "extract-req":
+                sendLinks(extractLinks());
                 break;
 
             default:
@@ -245,8 +278,12 @@
 
     window.addEventListener("__wb_from_event", localEvent);
 
-    function load_all_links() {
-        function get_links(query, win, store) {
+    function extractLinks(query) {
+        if (!query) {
+            query = "a[href]";
+        }
+
+        function getLinks(query, win, store) {
             try {
                 var results = win.document.querySelectorAll(query);
             } catch (e) {
@@ -256,7 +293,7 @@
 
             for (var i = 0; i < results.length; i++) {
                 var link = results[i].href;
-                if (!link || link.charAt(0) == "#") {
+                if (!link || link.charAt(0) == "#" || link.indexOf("javascript:") == 0) {
                     continue;
                 }
 
@@ -264,19 +301,17 @@
             }
 
             for (var i = 0; i < win.frames.length; i++) {
-                get_links(query, win.frames[i], store);
+                getLinks(query, win.frames[i], store);
             }
         }
 
         var link_map = {};
 
-        get_links("a[href]", window, link_map);
+        getLinks(query, window, link_map);
 
-        console.log(link_map);
-
-        for (var link in link_map) {
-            window.open(link);
-        }
+        return Object.keys(link_map);
     }
+
+    window.extractLinks = extractLinks;
 
 })();

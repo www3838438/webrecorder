@@ -8,6 +8,7 @@ import logging
 import json
 import gevent
 import websocket
+import traceback
 
 from webrecorder.utils import init_logging
 
@@ -197,11 +198,16 @@ class AutoBrowser(object):
         self.browser_mgr = auto.auto_mgr.browser_mgr
         self.cdata = cdata
 
-        self.running = False
+        self.reqid = None
+        self.tab_ws = None
 
-        #self.pubsub = self.redis.pubsub(ignore_subscribe_messages=True)
+        self.callbacks = {}
 
-        self.init_with_reqid(reqid)
+        self.pubsub = self.redis.pubsub(ignore_subscribe_messages=True)
+
+        self.init(reqid)
+
+        gevent.spawn(self.recv_pubsub_loop)
 
         logging.debug('Auto Browser Inited: ' + self.reqid)
 
@@ -209,13 +215,15 @@ class AutoBrowser(object):
         if self.running:
             return
 
-        self.init_with_reqid()
+        self.init()
 
         logging.debug('Auto Browser Re-Inited: ' + self.reqid)
 
-    def init_with_reqid(self, reqid=None):
+    def init(self, reqid=None):
         ip = None
         tab = None
+
+        self.close()
 
         # attempt to connect to existing browser/tab
         if reqid:
@@ -237,8 +245,9 @@ class AutoBrowser(object):
 
         self.auto.browser_added(reqid)
 
+        self.pubsub.subscribe('from_cbr_ps:' + reqid)
+
         self.init_tab_conn()
-        gevent.spawn(self.recv_loop)
 
     def find_browser_tab(self, ip, url=None):
         try:
@@ -301,7 +310,10 @@ class AutoBrowser(object):
             self.send_ws({"method": "Page.enable"})
             logging.debug('Page.enable on ' + self.tab['webSocketDebuggerUrl'])
 
+            #self.send_ws({"method": "Console.enable"})
+
             self.running = True
+            gevent.spawn(self.recv_ws_loop)
 
             # quene next url!
             self.queue_next()
@@ -315,24 +327,59 @@ class AutoBrowser(object):
             name, url_req_data = self.redis.blpop(self.browser_q)
             url_req = json.loads(url_req_data)
 
-            self.curr_url_req = url_req
+            self.hops = url_req.get('hops', 0)
+
+            def save_frame(resp):
+                frame_id = resp['result'].get('frameId')
+                if frame_id:
+                    self.frame_id = frame_id
 
             try:
                 logging.debug('Queuing Next: ' + str(url_req))
-                self.send_ws({"method": "Page.navigate", "params": {"url": url_req['url']}})
+                self.send_ws({"method": "Page.navigate", "params": {"url": url_req['url']}},
+                             save_frame)
             except:
                 self.redis.rpush(self.browser_q, url_req_data)
 
         gevent.spawn(wait_queue)
 
-    def recv_loop(self):
+    def pubsub_listen(self):
+        try:
+            for item in self.pubsub.listen():
+                yield item
+        except:
+            return
+
+    def recv_pubsub_loop(self):
+        logging.debug('Start PubSub Listen')
+
+        for item in self.pubsub_listen():
+            try:
+                if item['type'] != 'message':
+                    continue
+
+                msg = json.loads(item['data'])
+                logging.debug(str(msg))
+
+                if msg['ws_type'] == 'remote_url':
+                    pass
+                    #logging.debug('URL LOADED: ' + str(msg))
+                    #logging.debug('AUTOSCROLLING')
+
+                elif msg['ws_type'] == 'autoscroll_resp':
+                    self.load_links()
+
+            except:
+                traceback.print_exc()
+
+    def recv_ws_loop(self):
         try:
             while self.running:
                 resp = self.tab_ws.recv()
                 resp = json.loads(resp)
 
                 try:
-                    if resp.get('id') == self.id_count and 'result' in resp:
+                    if 'result' in resp and 'id' in resp:
                         self.handle_result(resp)
 
                     elif resp.get('method') == 'Page.frameNavigated':
@@ -351,11 +398,37 @@ class AutoBrowser(object):
         finally:
             self.close()
 
+    def load_links(self):
+        logging.debug('HOPS LEFT: ' + str(self.hops))
+        if not self.hops:
+            self.queue_next()
+            return
+
+        def handle_links(resp):
+            links = json.loads(resp['result']['result']['value'])
+
+            logging.debug('Links')
+            logging.debug(str(links))
+
+            for link in links:
+                url_req = {'url': link,
+                           'hops': self.hops - 1}
+
+                self.redis.rpush(self.browser_q, json.dumps(url_req))
+
+            self.queue_next()
+
+        self.eval('JSON.stringify(window.extractLinks ? window.extractLinks() : [])', handle_links)
+
     def handle_result(self, resp):
-        result = resp['result']
-        frame_id = result.get('frameId')
-        if frame_id:
-            self.frame_id = frame_id
+        callback = self.callbacks.pop(resp['id'], None)
+        if callback:
+            try:
+                callback(resp)
+            except Exception as e:
+                logging.debug(str(e))
+        else:
+            logging.debug('No Callback found for: ' + str(resp['id']))
 
     def handle_frameStoppedLoading(self, resp):
         frame_id = resp['params']['frameId']
@@ -364,7 +437,23 @@ class AutoBrowser(object):
         if frame_id != self.frame_id:
             return
 
-        self.queue_next()
+        # if not html, continue
+        if self.curr_mime != 'text/html':
+            self.queue_next()
+            return
+
+        if self.auto['autoscroll']:
+            self.send_pubsub({'ws_type': 'autoscroll'})
+        else:
+            self.load_links()
+
+    def send_pubsub(self, msg):
+        if not self.reqid:
+            return
+
+        channel = 'to_cbr_ps:' + self.reqid
+        msg = json.dumps(msg)
+        self.redis.publish(channel, msg)
 
     def handle_frameNavigated(self, resp):
         frame = resp['params']['frame']
@@ -393,14 +482,26 @@ class AutoBrowser(object):
 
             recording.add_page(page, False)
 
-    def send_ws(self, data):
+    def send_ws(self, data, callback=None):
         self.id_count += 1
         data['id'] = self.id_count
+        if callback:
+            self.callbacks[self.id_count] = callback
+
         self.tab_ws.send(json.dumps(data))
+
+    def eval(self, expr, callback=None):
+        self.send_ws({"method": "Runtime.evaluate", "params": {"expression": expr}}, callback)
 
     def close(self):
         self.running = False
-        self.auto.browser_removed(self.reqid)
+
+        if self.pubsub:
+            self.pubsub.unsubscribe()
+
+        if self.reqid:
+            self.auto.browser_removed(self.reqid)
+
         self.reqid = None
 
         try:

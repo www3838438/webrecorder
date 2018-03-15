@@ -19,6 +19,9 @@ class Auto(RedisUniqueComponent):
 
     ALL_BROWSERS = 'n:auto_br'
 
+    DEFAULT_HOPS = 0
+    DEFAULT_BROWSERS = 1
+
     INACTIVE = '0'
     READY = '10'
     RUNNING = '20'
@@ -34,7 +37,12 @@ class Auto(RedisUniqueComponent):
 
         aid = self._create_new_id()
 
-        self.data = {'max_browsers': '1',
+        self.data = {'max_browsers': self.DEFAULT_BROWSERS}
+
+        if props:
+            self.data.update(props)
+
+        self.data.update({
                      'status': self.INACTIVE,
 
                      'owner': collection.my_id,
@@ -45,7 +53,7 @@ class Auto(RedisUniqueComponent):
                      'browser': 'chrome:60',
                      'request_ts': '',
                      'type': 'record'
-                    }
+                    })
 
         self.name = str(aid)
         self._init_new()
@@ -77,8 +85,12 @@ class Auto(RedisUniqueComponent):
         if not blist:
             return 'List Not Found'
 
+        hops = int(self.get_prop('hops', self.DEFAULT_HOPS))
+
         for bookmark in blist.get_bookmarks():
             url_req = {'url': bookmark['url']}
+            if hops:
+                url_req['hops'] = hops
             print('Queuing: ' + str(url_req))
             self.redis.rpush(self.browser_q, json.dumps(url_req))
 
