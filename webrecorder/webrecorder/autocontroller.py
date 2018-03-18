@@ -30,6 +30,15 @@ class AutoController(BaseController):
             auto.start()
             return {'status': auto['status']}
 
+        # GET AUTO
+        @self.app.get('/api/v1/auto/<aid>')
+        def get_auto(aid):
+            user, collection, auto = self.load_user_coll_auto(aid)
+
+            self.access.assert_can_admin_coll(collection)
+
+            return {'auto': auto.serialize()}
+
         # DELETE AUTO
         @self.app.delete('/api/v1/auto/<aid>')
         def delete_auto(aid):

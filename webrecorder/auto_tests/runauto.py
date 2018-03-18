@@ -88,7 +88,8 @@ class TestAuto(object):
         assert res.json()['status']
 
     def test_create_auto(self):
-        res = self.post('/api/v1/auto?user=testauto&coll=auto-test')
+        params = {'hops': 0}
+        res = self.post('/api/v1/auto?user=testauto&coll=auto-test', json=params)
 
         assert res.json()['auto']
         TestAuto.AUTO_ID = res.json()['auto']
@@ -98,6 +99,12 @@ class TestAuto(object):
         res = self.post('/api/v1/auto/{0}/queue_list?user=testauto&coll=auto-test'.format(self.AUTO_ID), json=params)
 
         assert res.json()['status']
+
+    def test_get_auto(self):
+        res = self.get('/api/v1/auto/{0}?user=testauto&coll=auto-test'.format(self.AUTO_ID))
+
+        assert res.json()['auto']
+        assert res.json()['auto']['queue']
 
     @pytest.mark.delete
     def _test_delete_auto(self):

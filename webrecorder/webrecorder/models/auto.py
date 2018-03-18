@@ -85,6 +85,13 @@ class Auto(RedisUniqueComponent):
         if not blist:
             return 'List Not Found'
 
+        rec = self['rec']
+        if rec:
+            recording = collection.get_recording_by_id(rec, '')
+            if not recording.is_open():
+                self['status'] = self.DONE
+                return 'Recording Finished'
+
         hops = int(self.get_prop('hops', self.DEFAULT_HOPS))
 
         for bookmark in blist.get_bookmarks():
@@ -95,6 +102,12 @@ class Auto(RedisUniqueComponent):
             self.redis.rpush(self.browser_q, json.dumps(url_req))
 
         return None
+
+    def serialize(self):
+        data = super(Auto, self).serialize()
+        data['active_browsers'] = self.redis.hgetall(self.BR_KEY.format(auto=self.my_id))
+        data['queue'] = self.redis.lrange(self.Q_KEY.format(auto=self.my_id), 0, -1)
+        return data
 
     def delete_me(self):
         self.access.assert_can_admin_coll(self.get_owner())

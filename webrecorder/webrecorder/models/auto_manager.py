@@ -47,6 +47,9 @@ class AutoManager(object):
         auto = RunnableAuto(auto_mgr=self,
                             my_id=aid)
 
+        if auto['status'] == auto.DONE:
+            return
+
         logging.debug('Adding auto for processing: ' + str(aid))
 
         if auto.my_id not in self.autos:
@@ -107,7 +110,16 @@ class RunnableAuto(Auto):
             logging.debug('Automation {0} not ready or running'.format(self.my_id))
             return
 
+        self.recording = self._init_recording()
+
         self.init_browsers()
+
+    def _init_recording(self):
+        recording = Recording(my_id=self['rec'],
+                              redis=self.redis,
+                              access=self.auto_mgr.user_manager.access)
+
+        return recording
 
     def close(self):
         for browser in self.browsers:
@@ -135,7 +147,7 @@ class RunnableAuto(Auto):
                      }
 
         self.browsers = []
-        active_reqids = self.redis.smembers(self.br_key)
+        active_reqids = self.redis.hkeys(self.br_key)
 
         max_browsers = int(self['max_browsers'])
 
@@ -156,6 +168,12 @@ class RunnableAuto(Auto):
         if self['status'] != self.RUNNING:
             return
 
+        if not self.recording.is_open():
+            self['status'] = self.DONE
+            logging.debug('Recording Finished, Closing Auto')
+            self.redis.rpush(Auto.DEL_AUTO_KEY, self.my_id)
+            return
+
         logging.debug('Auto Running: ' + self.my_id)
 
         max_browsers = int(self['max_browsers'])
@@ -172,12 +190,12 @@ class RunnableAuto(Auto):
             if not browser.running:
                 browser.reinit()
 
-    def browser_added(self, reqid):
-        self.redis.sadd(self.br_key, reqid)
+    def browser_added(self, reqid, url):
+        self.redis.hset(self.br_key, reqid, url)
 
     def browser_removed(self, reqid):
         if reqid:
-            self.redis.srem(self.br_key, reqid)
+            self.redis.hdel(self.br_key, reqid)
 
     def __getitem__(self, name):
         return self.get_prop(name, force_update=True)
@@ -243,7 +261,7 @@ class AutoBrowser(object):
         self.ip = ip
         self.tab = tab
 
-        self.auto.browser_added(reqid)
+        self.auto.browser_added(reqid, '')
 
         self.pubsub.subscribe('from_cbr_ps:' + reqid)
 
@@ -306,6 +324,8 @@ class AutoBrowser(object):
             self.id_count = 0
             self.frame_id = ''
             self.curr_mime = ''
+            self.curr_url = ''
+            self.hops = 0
 
             self.send_ws({"method": "Page.enable"})
             logging.debug('Page.enable on ' + self.tab['webSocketDebuggerUrl'])
@@ -323,25 +343,41 @@ class AutoBrowser(object):
             self.running = False
 
     def queue_next(self):
-        def wait_queue():
+        gevent.spawn(self.wait_queue)
+
+    def should_visit(self, url):
+        # TODO:
+        return True
+
+    def wait_queue(self):
+        # reset to empty url to indicate previous page is done
+        self.auto.browser_added(self.reqid, '')
+
+        while self.running:
             name, url_req_data = self.redis.blpop(self.browser_q)
             url_req = json.loads(url_req_data)
 
+            if self.should_visit(url_req['url']):
+                break
+
+        def save_frame(resp):
+            frame_id = resp['result'].get('frameId')
+            if frame_id:
+                self.frame_id = frame_id
+
+        try:
+            logging.debug('Queuing Next: ' + str(url_req))
+
             self.hops = url_req.get('hops', 0)
+            self.curr_url = url_req['url']
 
-            def save_frame(resp):
-                frame_id = resp['result'].get('frameId')
-                if frame_id:
-                    self.frame_id = frame_id
+            self.send_ws({"method": "Page.navigate", "params": {"url": self.curr_url}},
+                         save_frame)
 
-            try:
-                logging.debug('Queuing Next: ' + str(url_req))
-                self.send_ws({"method": "Page.navigate", "params": {"url": url_req['url']}},
-                             save_frame)
-            except:
-                self.redis.rpush(self.browser_q, url_req_data)
+            self.auto.browser_added(self.reqid, url_req['url'])
 
-        gevent.spawn(wait_queue)
+        except:
+            self.redis.rpush(self.browser_q, url_req_data)
 
     def pubsub_listen(self):
         try:
@@ -411,8 +447,10 @@ class AutoBrowser(object):
             logging.debug(str(links))
 
             for link in links:
-                url_req = {'url': link,
-                           'hops': self.hops - 1}
+                url_req = {'url': link}
+                # set hops if >0
+                if self.hops > 1:
+                    url_req['hops'] = self.hops - 1
 
                 self.redis.rpush(self.browser_q, json.dumps(url_req))
 
@@ -470,17 +508,13 @@ class AutoBrowser(object):
 
         # if text/html, already should have been added
         if self.curr_mime != 'text/html':
-            recording = Recording(my_id=self.cdata['rec'],
-                                  redis=self.redis,
-                                  access=self.auto.auto_mgr.user_manager.access)
-
             page = {'url': frame['url'],
                     'title': frame['url'],
                     'timestamp': self.cdata['request_ts'] or timestamp_now(),
                     'browser': self.cdata['browser'],
                    }
 
-            recording.add_page(page, False)
+            self.auto.recording.add_page(page, False)
 
     def send_ws(self, data, callback=None):
         self.id_count += 1
