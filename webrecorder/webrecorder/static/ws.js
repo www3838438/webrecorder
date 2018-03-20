@@ -283,6 +283,8 @@
             query = "a[href]";
         }
 
+        var skip_prefixes = ["#", "javascript:", "mailto:", "data:", "blob:", "file:"];
+
         function getLinks(query, win, store) {
             try {
                 var results = win.document.querySelectorAll(query);
@@ -293,8 +295,14 @@
 
             for (var i = 0; i < results.length; i++) {
                 var link = results[i].href;
-                if (!link || link.charAt(0) == "#" || link.indexOf("javascript:") == 0) {
+                if (!link) {
                     continue;
+                }
+
+                for (var skip = 0; skip < skip_prefixes.length; skip++) {
+                    if (link.indexOf(skip_prefixes[skip]) == 0) {
+                        continue;
+                    }
                 }
 
                 store[link] = 1;

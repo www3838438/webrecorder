@@ -9,6 +9,7 @@ class Auto(RedisUniqueComponent):
     INFO_KEY = 'a:{auto}:info'
     BR_KEY = 'a:{auto}:br'
     Q_KEY = 'a:{auto}:q'
+    SCOPE_KEY = 'a:{auto}:scope'
 
     ALL_KEYS = 'a:{auto}:*'
 
@@ -17,7 +18,6 @@ class Auto(RedisUniqueComponent):
     NEW_AUTO_KEY = 'q:auto:add'
     DEL_AUTO_KEY = 'q:auto:del'
 
-    ALL_BROWSERS = 'n:auto_br'
 
     DEFAULT_HOPS = 0
     DEFAULT_BROWSERS = 1
@@ -37,10 +37,9 @@ class Auto(RedisUniqueComponent):
 
         aid = self._create_new_id()
 
-        self.data = {'max_browsers': self.DEFAULT_BROWSERS}
-
-        if props:
-            self.data.update(props)
+        self.data = {'max_browsers': props.get('max_browsers', self.DEFAULT_BROWSERS),
+                     'hops': props.get('hops', 0)
+                    }
 
         self.data.update({
                      'status': self.INACTIVE,
@@ -54,6 +53,12 @@ class Auto(RedisUniqueComponent):
                      'request_ts': '',
                      'type': 'record'
                     })
+
+        scopes = props.get('scopes')
+        if scopes:
+            scope_key = self.SCOPE_KEY.format(auto=aid)
+            for scope in scopes:
+                self.redis.sadd(scope_key, scope)
 
         self.name = str(aid)
         self._init_new()
@@ -107,6 +112,7 @@ class Auto(RedisUniqueComponent):
         data = super(Auto, self).serialize()
         data['active_browsers'] = self.redis.hgetall(self.BR_KEY.format(auto=self.my_id))
         data['queue'] = self.redis.lrange(self.Q_KEY.format(auto=self.my_id), 0, -1)
+        data['scopes'] = list(self.redis.smembers(self.SCOPE_KEY.format(auto=self.my_id)))
         return data
 
     def delete_me(self):

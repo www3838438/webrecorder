@@ -10,6 +10,9 @@ import gevent
 import websocket
 import traceback
 
+import re
+from urllib.parse import quote
+
 from webrecorder.utils import init_logging
 
 from warcio.timeutils import timestamp_now
@@ -23,6 +26,8 @@ from webrecorder.browsermanager import BrowserManager
 
 # ============================================================================
 class AutoManager(object):
+    INDEX_TEMPL = '{warcserver}/replay/index?param.user={user}&param.coll={coll}&param.rec={rec}&allowFuzzy=0'
+
     def __init__(self):
         self.user_manager = CLIUserManager()
 
@@ -110,6 +115,9 @@ class RunnableAuto(Auto):
             logging.debug('Automation {0} not ready or running'.format(self.my_id))
             return
 
+        scopes = self.redis.smembers(self.SCOPE_KEY.format(auto=self.my_id))
+        self.scopes = [re.compile(scope) for scope in scopes]
+
         self.recording = self._init_recording()
 
         self.init_browsers()
@@ -145,6 +153,12 @@ class RunnableAuto(Auto):
                       'request_ts': self['request_ts'],
                       'url': 'about:blank',
                      }
+
+        self.index_check_url = AutoManager.INDEX_TEMPL.format(
+                                    warcserver=os.environ['WARCSERVER_HOST'],
+                                    user=self.cdata['user'],
+                                    coll=self.cdata['coll'],
+                                    rec=self.cdata['rec'])
 
         self.browsers = []
         active_reqids = self.redis.hkeys(self.br_key)
@@ -345,9 +359,34 @@ class AutoBrowser(object):
     def queue_next(self):
         gevent.spawn(self.wait_queue)
 
+    def already_recorded(self, url):
+        url = self.auto.index_check_url + '&url=' + quote(url)
+        try:
+            res = requests.get(url)
+            return res.text != ''
+        except Exception as e:
+            logging.debug(str(e))
+            return False
+
     def should_visit(self, url):
-        # TODO:
-        return True
+        """ return url that should be visited, or None to skip this url
+        """
+        if '#' in url:
+            url = url.split('#', 1)[0]
+
+        if self.already_recorded(url):
+            logging.debug('Skipping Dupe: ' + url)
+            return None
+
+        if self.auto.scopes:
+            for scope in self.auto.scopes:
+                if scope.search(url):
+                    logging.debug('In scope: ' + scope.pattern)
+                    return url
+
+            return None
+
+        return url
 
     def wait_queue(self):
         # reset to empty url to indicate previous page is done
@@ -357,7 +396,8 @@ class AutoBrowser(object):
             name, url_req_data = self.redis.blpop(self.browser_q)
             url_req = json.loads(url_req_data)
 
-            if self.should_visit(url_req['url']):
+            url_req['url'] = self.should_visit(url_req['url'])
+            if url_req['url']:
                 break
 
         def save_frame(resp):
