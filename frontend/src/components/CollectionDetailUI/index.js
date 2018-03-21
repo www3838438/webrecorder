@@ -31,6 +31,7 @@ class CollectionDetailUI extends Component {
   static propTypes = {
     addPagesToLists: PropTypes.func,
     auth: PropTypes.object,
+    autoQueued: PropTypes.bool,
     browsers: PropTypes.object,
     collection: PropTypes.object,
     deleteRec: PropTypes.func,
@@ -539,8 +540,8 @@ class CollectionDetailUI extends Component {
                 header={<h4>New Automation</h4>}
                 footer={
                   <React.Fragment>
-                    <Button style={{ marginRight: 5 }}>Cancel</Button>
-                    <Button onClick={this.startAutomation} bsStyle="success">Create</Button>
+                    <Button style={{ marginRight: 5 }} onClick={this.closeAutoModal}>Close</Button>
+                    <Button onClick={this.startAutomation} bsStyle={this.props.autoQueued ? 'success' : 'primary'}>{`Create${this.props.autoQueued ? 'd!' : ''}`}</Button>
                   </React.Fragment>
                 }>
                 <React.Fragment>

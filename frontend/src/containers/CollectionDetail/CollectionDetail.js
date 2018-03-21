@@ -82,6 +82,7 @@ const mapStateToProps = (outerState) => {
 
   return {
     auth: app.get('auth'),
+    autoQueued: app.getIn(['collection', 'queued']),
     collection: app.get('collection'),
     browsers: app.get('remoteBrowsers'),
     loaded: reduxAsyncConnect.loaded,
@@ -126,7 +127,8 @@ const mapDispatchToProps = (dispatch, { history, match: { params: { user, coll }
       dispatch(createList(user, coll, listTitle))
         .then(({ list }) => { listId = list.id; return dispatch(newAuto(user, coll)); })
         .then(({ auto }) => { autoId = auto; return dispatch(bulkAddTo(user, coll, listId, bookmarks)); })
-        .then(res => dispatch(queueAuto(user, coll, autoId, listId)));
+        .then(() => dispatch(queueAuto(user, coll, autoId, listId)))
+        .then(() => dispatch(loadColl(user, coll)));
     },
 
     searchPages: createSearchAction('collection.pages'),

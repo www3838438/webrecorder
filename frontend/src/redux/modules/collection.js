@@ -37,7 +37,8 @@ const initialState = fromJS({
   loading: false,
   loaded: false,
   error: null,
-  sortBy: defaultSort
+  sortBy: defaultSort,
+  queued: false
 });
 
 
@@ -99,6 +100,8 @@ export default function collection(state = initialState, action = {}) {
       return state.set('descSave', false);
     case NEW_AUTO_SUCCESS:
       return state.set('autoId', action.result.auto);
+    case QUEUE_AUTO_SUCCESS:
+      return state.set('queued', true);
 
     case LISTS_LOAD_FAIL:
     case LISTS_LOAD:
