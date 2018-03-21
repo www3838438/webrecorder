@@ -4,8 +4,9 @@ import PropTypes from 'prop-types';
 import AutoSizer from 'react-virtualized/dist/commonjs/AutoSizer';
 import Column from 'react-virtualized/dist/commonjs/Table/Column';
 import Table from 'react-virtualized/dist/commonjs/Table';
-import { Button } from 'react-bootstrap';
+import { Button, FormGroup, ControlLabel, FormControl } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
+import { fromJS } from 'immutable';
 
 import { setSort } from 'redux/modules/collection';
 import { getStorage, inStorage, setStorage, range } from 'helpers/utils';
@@ -19,7 +20,7 @@ import { CloseIcon } from 'components/icons';
 import 'react-virtualized/styles.css';
 
 import CollectionSidebar from './sidebar';
-import { DefaultRow, DnDRow, DnDSortableRow } from './rows';
+import { DnDRow, DnDSortableRow } from './rows';
 import CollectionManagement from './management';
 import { BrowserRenderer, LinkRenderer, RemoveRenderer, TimestampRenderer } from './columns';
 
@@ -40,7 +41,8 @@ class CollectionDetailUI extends Component {
     removeBookmark: PropTypes.func,
     saveBookmarkSort: PropTypes.func,
     searchText: PropTypes.string,
-    searchPages: PropTypes.func
+    searchPages: PropTypes.func,
+    startAuto: PropTypes.func
   };
 
   static contextTypes = {
@@ -51,6 +53,8 @@ class CollectionDetailUI extends Component {
   constructor(props) {
     super(props);
 
+    this.keyBuffer = [];
+    this.matchCode = fromJS([91, 16, 65]);
     this.initialState = {
       addToListModal: false,
       checkedLists: {},
@@ -61,7 +65,11 @@ class CollectionDetailUI extends Component {
       selectedSession: null,
       selectedPageIdx: null,
       selectedGroupedPageIdx: null,
-      selectedRec: null
+      selectedRec: null,
+
+      autoModal: false,
+      listAutoName: '',
+      listAutoLinks: ''
     };
 
     this.state = this.initialState;
@@ -75,6 +83,8 @@ class CollectionDetailUI extends Component {
         console.log('Wrong `groupDisplay` storage value');
       }
     }
+
+    document.addEventListener('keydown', this.handleKey);
   }
 
   componentWillReceiveProps(nextProps) {
@@ -97,6 +107,10 @@ class CollectionDetailUI extends Component {
     if(!prevState.gourpedDisplay && this.state.groupDisplay && this.state.scrollToRec) {
       this.openAndScroll(this.state.scrollToRec);
     }
+  }
+
+  componentWillUnmount() {
+    document.removeEventListener('keydown', this.handleKey);
   }
 
   onToggle = (e) => {
@@ -188,6 +202,26 @@ class CollectionDetailUI extends Component {
         selectedRec: null
       });
     }
+  }
+
+  handleKey = (evt) => {
+    this.keyBuffer.push(evt.keyCode);
+
+    if (fromJS(this.keyBuffer).equals(this.matchCode)) {
+      this.setState({ autoModal: true });
+    }
+
+    setTimeout(() => { this.keyBuffer = []; }, 1000);
+  }
+
+  closeAutoModal = () => this.setState({ autoModal: false })
+
+  startAutomation = () => {
+    const { collection } = this.props;
+    const { listAutoName, listAutoLinks } = this.state;
+
+    const links = listAutoLinks.trim().split('\n').map(o => ({ url: o, title: 'Untitled Document' }));
+    this.props.startAuto(collection.get('user'), collection.get('id'), listAutoName, links);
   }
 
   addToList = () => {
@@ -499,7 +533,38 @@ class CollectionDetailUI extends Component {
                   }
                 </ul>
               </Modal>
-
+              <Modal
+                visible={this.state.autoModal}
+                closeCb={this.closeAutoModal}
+                header={<h4>New Automation</h4>}
+                footer={
+                  <React.Fragment>
+                    <Button style={{ marginRight: 5 }}>Cancel</Button>
+                    <Button onClick={this.startAutomation} bsStyle="success">Create</Button>
+                  </React.Fragment>
+                }>
+                <React.Fragment>
+                  <FormGroup>
+                    <ControlLabel>List title:</ControlLabel>
+                    <FormControl
+                      id="confirm-delete"
+                      type="text"
+                      name="listAutoName"
+                      value={this.state.listAutoName}
+                      onChange={this.handleChange} />
+                  </FormGroup>
+                  <FormGroup controlId="formControlsTextarea">
+                    <ControlLabel>Links</ControlLabel>
+                    <FormControl
+                      componentClass="textarea"
+                      name="listAutoLinks"
+                      value={this.state.listAutoLinks}
+                      placeholder="http://example.com"
+                      style={{ minHeight: '200px' }}
+                      onChange={this.handleChange} />
+                  </FormGroup>
+                </React.Fragment>
+              </Modal>
             </React.Fragment>
         }
       </div>
