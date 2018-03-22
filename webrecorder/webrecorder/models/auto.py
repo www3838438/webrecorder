@@ -8,6 +8,7 @@ class Auto(RedisUniqueComponent):
 
     INFO_KEY = 'a:{auto}:info'
     BR_KEY = 'a:{auto}:br'
+    TAB_KEY = 'a:{auto}:t:{reqid}'
     Q_KEY = 'a:{auto}:q'
     SCOPE_KEY = 'a:{auto}:scope'
 
@@ -38,7 +39,8 @@ class Auto(RedisUniqueComponent):
         aid = self._create_new_id()
 
         self.data = {'max_browsers': props.get('max_browsers', self.DEFAULT_BROWSERS),
-                     'hops': props.get('hops', 0)
+                     'hops': props.get('hops', 0),
+                     'num_tabs': props.get('num_tabs', 1)
                     }
 
         self.data.update({
@@ -108,9 +110,19 @@ class Auto(RedisUniqueComponent):
 
         return None
 
+    def get_tab_key(self, reqid):
+        return self.TAB_KEY.format(auto=self.my_id, reqid=reqid)
+
     def serialize(self):
         data = super(Auto, self).serialize()
-        data['active_browsers'] = self.redis.hgetall(self.BR_KEY.format(auto=self.my_id))
+        reqids = self.redis.smembers(self.BR_KEY.format(auto=self.my_id))
+        browsers = {}
+        for reqid in reqids:
+            tabs = self.redis.hgetall(self.get_tab_key(reqid))
+            if tabs:
+                browsers[reqid] = tabs
+
+        data['active_browsers'] = browsers
         data['queue'] = self.redis.lrange(self.Q_KEY.format(auto=self.my_id), 0, -1)
         data['scopes'] = list(self.redis.smembers(self.SCOPE_KEY.format(auto=self.my_id)))
         return data

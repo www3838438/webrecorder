@@ -111,6 +111,8 @@ class RunnableAuto(Auto):
         self.cdata = {}
         self.br_key = self.BR_KEY.format(auto=self.my_id)
 
+        self.num_tabs = int(self.get_prop('num_tabs', 1))
+
         if self['status'] != self.RUNNING and self['status'] != self.READY:
             logging.debug('Automation {0} not ready or running'.format(self.my_id))
             return
@@ -161,7 +163,7 @@ class RunnableAuto(Auto):
                                     rec=self.cdata['rec'])
 
         self.browsers = []
-        active_reqids = self.redis.hkeys(self.br_key)
+        active_reqids = self.redis.smembers(self.br_key)
 
         max_browsers = int(self['max_browsers'])
 
@@ -204,12 +206,20 @@ class RunnableAuto(Auto):
             if not browser.running:
                 browser.reinit()
 
-    def browser_added(self, reqid, url):
-        self.redis.hset(self.br_key, reqid, url)
+    def browser_added(self, reqid):
+        self.redis.sadd(self.br_key, reqid)
 
     def browser_removed(self, reqid):
         if reqid:
-            self.redis.hdel(self.br_key, reqid)
+            self.redis.srem(self.br_key, reqid)
+            self.redis.delete(self.get_tab_key(reqid))
+
+    def tab_added(self, reqid, tabid, url):
+        self.redis.hset(self.get_tab_key(reqid), tabid, url)
+
+    def tab_removed(self, reqid, tabid):
+        if reqid:
+            self.redis.hdel(self.get_tab_key(reqid), tabid)
 
     def __getitem__(self, name):
         return self.get_prop(name, force_update=True)
@@ -218,6 +228,7 @@ class RunnableAuto(Auto):
 # ============================================================================
 class AutoBrowser(object):
     CDP_JSON = 'http://{ip}:9222/json'
+    CDP_JSON_NEW = 'http://{ip}:9222/json/new'
 
     REQ_KEY = 'req:{id}'
 
@@ -231,11 +242,12 @@ class AutoBrowser(object):
         self.cdata = cdata
 
         self.reqid = None
-        self.tab_ws = None
 
-        self.callbacks = {}
+        self.num_tabs = self.auto.num_tabs
 
         self.pubsub = self.redis.pubsub(ignore_subscribe_messages=True)
+
+        self.running = False
 
         self.init(reqid)
 
@@ -252,8 +264,9 @@ class AutoBrowser(object):
         logging.debug('Auto Browser Re-Inited: ' + self.reqid)
 
     def init(self, reqid=None):
+        self.tabs = []
         ip = None
-        tab = None
+        tabs = None
 
         self.close()
 
@@ -261,38 +274,53 @@ class AutoBrowser(object):
         if reqid:
             ip = self.browser_mgr.get_ip_for_reqid(reqid)
             if ip:
-                tab = self.find_browser_tab(ip)
+                tabs = self.find_browser_tabs(ip)
 
             # ensure reqid is removed
-            if not tab:
+            if not tabs:
                 self.auto.browser_removed(reqid)
 
         # no tab found, init new browser
-        if not tab:
-            reqid, ip, tab = self.init_new_browser()
+        if not tabs:
+            reqid, ip, tabs = self.init_new_browser()
 
         self.reqid = reqid
         self.ip = ip
-        self.tab = tab
 
-        self.auto.browser_added(reqid, '')
+        self.running = True
+
+        self.auto.browser_added(reqid)
 
         self.pubsub.subscribe('from_cbr_ps:' + reqid)
 
-        self.init_tab_conn()
+        count = 0
+        for tab_data in tabs:
+            self.tabs.append(AutoTab(self, count, tab_data))
+            count += 1
 
-    def find_browser_tab(self, ip, url=None):
+    def find_browser_tabs(self, ip, url=None):
         try:
             res = requests.get(self.CDP_JSON.format(ip=ip))
             tabs = res.json()
         except:
             return
 
+        filtered_tabs = []
+
         for tab in tabs:
             if tab['type'] == 'page' and (not url or url == tab['url']):
-                return tab
+                filtered_tabs.append(tab)
 
-        return None
+        return filtered_tabs
+
+    def add_browser_tab(self, ip):
+        try:
+            res = requests.get(self.CDP_JSON_NEW.format(ip=ip))
+            tab = res.json()
+        except Exception as e:
+            logging.error('*** ' + str(e))
+
+        return tab
 
     def init_new_browser(self):
         launch_res = self.browser_mgr.request_new_browser(self.cdata)
@@ -320,41 +348,108 @@ class AutoBrowser(object):
 
         logging.debug('Launched: ' + str(res))
 
-        # wait to find tab
+        # wait to find first aab
         while True:
-            tab = self.find_browser_tab(res['ip'])
-            if tab:
+            tabs = self.find_browser_tabs(res['ip'])
+            if tabs:
                 break
 
             time.sleep(self.WAIT_TIME)
-            logging.debug('Waiting for Tab')
+            logging.debug('Waiting for first tab')
 
-        return reqid, res['ip'], tab
+        # add other tabs
+        logging.debug('NUM TABS: ' + str(self.auto.num_tabs))
+        for tab_count in range(self.auto.num_tabs - 1):
+            logging.debug('NEW TAB START')
+            tab = self.add_browser_tab(res['ip'])
+            tabs.append(tab)
 
-    def init_tab_conn(self):
+        return reqid, res['ip'], tabs
+
+    def pubsub_listen(self):
         try:
-            self.tab_ws = websocket.create_connection(self.tab['webSocketDebuggerUrl'])
+            for item in self.pubsub.listen():
+                yield item
+        except:
+            return
 
-            self.id_count = 0
-            self.frame_id = ''
-            self.curr_mime = ''
-            self.curr_url = ''
-            self.hops = 0
+    def recv_pubsub_loop(self):
+        logging.debug('Start PubSub Listen')
 
-            self.send_ws({"method": "Page.enable"})
-            logging.debug('Page.enable on ' + self.tab['webSocketDebuggerUrl'])
+        for item in self.pubsub_listen():
+            try:
+                if item['type'] != 'message':
+                    continue
 
-            #self.send_ws({"method": "Console.enable"})
+                msg = json.loads(item['data'])
+                logging.debug(str(msg))
 
-            self.running = True
-            gevent.spawn(self.recv_ws_loop)
+                if msg['ws_type'] == 'remote_url':
+                    pass
+                    #logging.debug('URL LOADED: ' + str(msg))
+                    #logging.debug('AUTOSCROLLING')
 
-            # quene next url!
-            self.queue_next()
+                elif msg['ws_type'] == 'autoscroll_resp':
+                    self.load_links()
 
-        except Exception as e:
-            logging.debug(str(e))
-            self.running = False
+            except:
+                traceback.print_exc()
+
+    def send_pubsub(self, msg):
+        if not self.reqid:
+            return
+
+        channel = 'to_cbr_ps:' + self.reqid
+        msg = json.dumps(msg)
+        self.redis.publish(channel, msg)
+
+    def close(self):
+        self.running = False
+
+        if self.pubsub:
+            self.pubsub.unsubscribe()
+
+        if self.reqid:
+            self.auto.browser_removed(self.reqid)
+
+        for tab in self.tabs:
+            tab.close()
+
+        self.reqid = None
+
+
+# ============================================================================
+class AutoTab(object):
+    def __init__(self, browser, tab_id, tab_data):
+        self.tab_id = tab_id
+        self.browser = browser
+        self.redis = browser.redis
+        self.auto = browser.auto
+        self.browser_q = browser.browser_q
+
+        self.tab_data = tab_data
+
+        logging.debug(str(tab_data))
+
+        self.ws = websocket.create_connection(tab_data['webSocketDebuggerUrl'])
+
+        self.id_count = 0
+        self.frame_id = ''
+        self.curr_mime = ''
+        self.curr_url = ''
+        self.hops = 0
+
+        self.callbacks = {}
+
+        self.send_ws({"method": "Page.enable"})
+        logging.debug('Page.enable on ' + tab_data['webSocketDebuggerUrl'])
+
+        #self.send_ws({"method": "Console.enable"})
+
+        gevent.spawn(self.recv_ws_loop)
+
+        # quene next url!
+        self.queue_next()
 
     def queue_next(self):
         gevent.spawn(self.wait_queue)
@@ -390,15 +485,21 @@ class AutoBrowser(object):
 
     def wait_queue(self):
         # reset to empty url to indicate previous page is done
-        self.auto.browser_added(self.reqid, '')
+        self.auto.tab_added(self.browser.reqid, self.tab_id, '')
+        url_req_data = None
+        url_req = None
 
-        while self.running:
+        while self.browser.running:
             name, url_req_data = self.redis.blpop(self.browser_q)
             url_req = json.loads(url_req_data)
 
             url_req['url'] = self.should_visit(url_req['url'])
             if url_req['url']:
                 break
+
+        if not url_req:
+            logging.debug('Browser Halted')
+            return
 
         def save_frame(resp):
             frame_id = resp['result'].get('frameId')
@@ -414,44 +515,17 @@ class AutoBrowser(object):
             self.send_ws({"method": "Page.navigate", "params": {"url": self.curr_url}},
                          save_frame)
 
-            self.auto.browser_added(self.reqid, url_req['url'])
+            self.auto.tab_added(self.browser.reqid, self.tab_id, url_req['url'])
 
-        except:
-            self.redis.rpush(self.browser_q, url_req_data)
-
-    def pubsub_listen(self):
-        try:
-            for item in self.pubsub.listen():
-                yield item
-        except:
-            return
-
-    def recv_pubsub_loop(self):
-        logging.debug('Start PubSub Listen')
-
-        for item in self.pubsub_listen():
-            try:
-                if item['type'] != 'message':
-                    continue
-
-                msg = json.loads(item['data'])
-                logging.debug(str(msg))
-
-                if msg['ws_type'] == 'remote_url':
-                    pass
-                    #logging.debug('URL LOADED: ' + str(msg))
-                    #logging.debug('AUTOSCROLLING')
-
-                elif msg['ws_type'] == 'autoscroll_resp':
-                    self.load_links()
-
-            except:
-                traceback.print_exc()
+        except Exception as e:
+            logging.error(' *** ' + str(e))
+            if url_req_data:
+                self.redis.rpush(self.browser_q, url_req_data)
 
     def recv_ws_loop(self):
         try:
-            while self.running:
-                resp = self.tab_ws.recv()
+            while self.browser.running:
+                resp = self.ws.recv()
                 resp = json.loads(resp)
 
                 try:
@@ -475,7 +549,7 @@ class AutoBrowser(object):
             self.close()
 
     def load_links(self):
-        logging.debug('HOPS LEFT: ' + str(self.hops))
+        #logging.debug('HOPS LEFT: ' + str(self.hops))
         if not self.hops:
             self.queue_next()
             return
@@ -521,17 +595,9 @@ class AutoBrowser(object):
             return
 
         if self.auto['autoscroll']:
-            self.send_pubsub({'ws_type': 'autoscroll'})
+            self.browser.send_pubsub({'ws_type': 'autoscroll'})
         else:
             self.load_links()
-
-    def send_pubsub(self, msg):
-        if not self.reqid:
-            return
-
-        channel = 'to_cbr_ps:' + self.reqid
-        msg = json.dumps(msg)
-        self.redis.publish(channel, msg)
 
     def handle_frameNavigated(self, resp):
         frame = resp['params']['frame']
@@ -562,30 +628,22 @@ class AutoBrowser(object):
         if callback:
             self.callbacks[self.id_count] = callback
 
-        self.tab_ws.send(json.dumps(data))
+        self.ws.send(json.dumps(data))
 
     def eval(self, expr, callback=None):
         self.send_ws({"method": "Runtime.evaluate", "params": {"expression": expr}}, callback)
 
     def close(self):
-        self.running = False
-
-        if self.pubsub:
-            self.pubsub.unsubscribe()
-
-        if self.reqid:
-            self.auto.browser_removed(self.reqid)
-
-        self.reqid = None
-
         try:
-            if self.tab_ws:
-                self.tab_ws.close()
+            if self.ws:
+                self.ws.close()
+
+            self.auto.tab_removed(self.browser.reqid, self.tab_id)
         except:
             pass
 
         finally:
-            self.tab_ws = None
+            self.ws = None
 
 
 # ============================================================================

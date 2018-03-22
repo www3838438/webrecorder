@@ -283,8 +283,6 @@
             query = "a[href]";
         }
 
-        var skip_prefixes = ["#", "javascript:", "mailto:", "data:", "blob:", "file:"];
-
         function getLinks(query, win, store) {
             try {
                 var results = win.document.querySelectorAll(query);
@@ -299,10 +297,8 @@
                     continue;
                 }
 
-                for (var skip = 0; skip < skip_prefixes.length; skip++) {
-                    if (link.indexOf(skip_prefixes[skip]) == 0) {
-                        continue;
-                    }
+                if (link.indexOf("http:") != 0 && link.indexOf("https:") != 0) {
+                    continue;
                 }
 
                 store[link] = 1;

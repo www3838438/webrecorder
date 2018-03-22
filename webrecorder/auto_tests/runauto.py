@@ -42,24 +42,30 @@ class TestAuto(object):
         assert res.json()['collection']['title'] == 'Auto Test'
 
     def test_create_list(self):
-        params = {'title': 'Bookmarks',
+        params = {'title': 'Seed List',
                   'desc': 'List Description Goes Here!'
                  }
 
         res = self.post('/api/v1/lists?user=testauto&coll=auto-test', json=params)
         assert res.json()['list']
-        assert res.json()['list']['title'] == 'Bookmarks'
+        assert res.json()['list']['title'] == 'Seed List'
 
         TestAuto.LIST_ID = res.json()['list']['id']
 
     def test_add_bookmarks(self):
         bookmarks = [
-                     {'url': 'http://example.com/', 'title': 'Example Com'},
-                     {'url': 'http://iana.org/', 'title': 'IANA'},
-                     {'url': 'https://eligrey.com/', 'title': 'XHTML'},
-                     {'url': 'https://twitter.com/webrecorder_io', 'title': 'Twitter'},
-                     {'url': 'http://unec.edu.az/application/uploads/2014/12/pdf-sample.pdf', 'title': 'A PDF'},
-                     {'url': 'https://www.iana.org/_img/2015.1/iana-logo-homepage.svg', 'title': 'An Image'},
+                     {'url': 'http://rhizome.org/', 'title': 'https://rhizome.org/'},
+
+                     #{'url': 'http://example.com/', 'title': 'Example Com'},
+                     #{'url': 'http://iana.org/', 'title': 'IANA'},
+                     #{'url': 'https://eff.org/', 'title': 'EFF'},
+
+                     #{'url': 'https://eligrey.com/', 'title': 'XHTML'},
+                     #{'url': 'https://twitter.com/webrecorder_io', 'title': 'Twitter'},
+                     #{'url': 'https://twitter.com/', 'title': 'Twitter'},
+
+                     #{'url': 'http://unec.edu.az/application/uploads/2014/12/pdf-sample.pdf', 'title': 'A PDF'},
+                     #{'url': 'https://www.iana.org/_img/2015.1/iana-logo-homepage.svg', 'title': 'An Image'},
                     ]
 
         list_id = self.LIST_ID
@@ -70,7 +76,7 @@ class TestAuto(object):
 
     @pytest.mark.append
     def test_append_only(self, append, auto_id):
-        params = {'title': 'Bookmarks Add'}
+        params = {'title': 'Add Url'}
 
         res = self.post('/api/v1/lists?user=testauto&coll=auto-test', json=params)
 
@@ -88,7 +94,12 @@ class TestAuto(object):
         assert res.json()['status']
 
     def test_create_auto(self):
-        params = {'hops': 0}
+        params = {'hops': 10,
+                  'num_tabs': 3,
+                  'max_browsers': 2,
+                  'scopes': ['rhizome.org'],
+                 }
+
         res = self.post('/api/v1/auto?user=testauto&coll=auto-test', json=params)
 
         assert res.json()['auto']

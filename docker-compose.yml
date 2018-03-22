@@ -123,7 +123,7 @@ services:
             - NETWORK_NAME=webrecorder_browsers
 
             - CONTAINER_EXPIRE_SECS=1200
-            - IDLE_TIMEOUT=120
+            - IDLE_TIMEOUT=360
 
         depends_on:
             - redis
