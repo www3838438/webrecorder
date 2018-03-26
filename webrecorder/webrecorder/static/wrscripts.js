@@ -162,7 +162,7 @@
 
     (function() {
         var sid = undefined;
-        var scroll_timeout = 2000;
+        var scroll_timeout = 200;
         var doneCallback = undefined;
         var lastScrolled = undefined;
 
@@ -213,7 +213,9 @@
             }
 
             function sendDone() {
-                sendMessage({wb_type: "autoscroll_resp", on: false});
+                sendMessage({"wb_type": "autoscroll_resp",
+                             "on": false,
+                             "url": window.location.href});
             }
 
             if (message.wb_type == "autoscroll") {

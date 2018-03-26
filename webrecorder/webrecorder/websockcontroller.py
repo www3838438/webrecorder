@@ -188,6 +188,7 @@ class BaseWebSockHandler(object):
         if not msg:
             return
 
+        print(msg)
         to_browser = None
         from_browser = None
         if self.name == 'to':
@@ -218,6 +219,8 @@ class BaseWebSockHandler(object):
                     page_local_store = msg['page']
 
                     check_dupes = (self.type_ == 'patch')
+
+                    page_local_store['browser'] = ''
 
                     self.recording.add_page(page_local_store, check_dupes)
 

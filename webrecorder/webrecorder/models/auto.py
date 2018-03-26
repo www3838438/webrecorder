@@ -40,7 +40,8 @@ class Auto(RedisUniqueComponent):
 
         self.data = {'max_browsers': props.get('max_browsers', self.DEFAULT_BROWSERS),
                      'hops': props.get('hops', 0),
-                     'num_tabs': props.get('num_tabs', 1)
+                     'num_tabs': props.get('num_tabs', 1),
+                     'autoscroll': props.get('autoscroll', 1),
                     }
 
         self.data.update({

@@ -94,9 +94,10 @@ class TestAuto(object):
         assert res.json()['status']
 
     def test_create_auto(self):
-        params = {'hops': 10,
+        params = {'hops': 1,
                   'num_tabs': 3,
-                  'max_browsers': 2,
+                  'max_browsers': 1,
+                  'autoscroll': 1,
                   'scopes': ['rhizome.org'],
                  }
 

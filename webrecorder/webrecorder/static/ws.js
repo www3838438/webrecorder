@@ -237,7 +237,8 @@
         }
 
         if (message.wb_type == "skipreq" ||
-            message.wb_type == "patch_req") {
+            message.wb_type == "patch_req" ||
+            message.wb_type == "autoscroll_resp") {
 
             message.ws_type = message.wb_type;
             delete message.wb_type;

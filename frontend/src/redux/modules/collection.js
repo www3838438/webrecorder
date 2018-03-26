@@ -194,7 +194,9 @@ export function newAuto(user, coll) {
     promise: client => client.post(`${apiPath}/auto`, {
       params: { user, coll },
       data: {
-        hops: 1
+        hops: 1,
+        num_tabs: 4,
+        max_browsers: 2
       }
     })
   };

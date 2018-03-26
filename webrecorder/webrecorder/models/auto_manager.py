@@ -266,7 +266,7 @@ class AutoBrowser(object):
     def init(self, reqid=None):
         self.tabs = []
         ip = None
-        tabs = None
+        tab_datas = None
 
         self.close()
 
@@ -274,18 +274,23 @@ class AutoBrowser(object):
         if reqid:
             ip = self.browser_mgr.get_ip_for_reqid(reqid)
             if ip:
-                tabs = self.find_browser_tabs(ip)
+                tab_datas = self.find_browser_tabs(ip)
 
             # ensure reqid is removed
-            if not tabs:
+            if not tab_datas:
                 self.auto.browser_removed(reqid)
 
         # no tab found, init new browser
-        if not tabs:
-            reqid, ip, tabs = self.init_new_browser()
+        if not tab_datas:
+            reqid, ip, tab_datas = self.init_new_browser()
 
         self.reqid = reqid
         self.ip = ip
+        self.tabs = []
+
+        for tab_data in tab_datas:
+            tab = AutoTab(self, tab_data)
+            self.tabs.append(tab)
 
         self.running = True
 
@@ -293,25 +298,37 @@ class AutoBrowser(object):
 
         self.pubsub.subscribe('from_cbr_ps:' + reqid)
 
-        count = 0
-        for tab_data in tabs:
-            self.tabs.append(AutoTab(self, count, tab_data))
-            count += 1
-
-    def find_browser_tabs(self, ip, url=None):
+    def find_browser_tabs(self, ip, url=None, require_ws=True):
         try:
             res = requests.get(self.CDP_JSON.format(ip=ip))
             tabs = res.json()
         except:
-            return
+            return {}
 
         filtered_tabs = []
 
         for tab in tabs:
-            if tab['type'] == 'page' and (not url or url == tab['url']):
+            logging.debug(str(tab))
+
+            if require_ws and 'webSocketDebuggerUrl' not in tab:
+                continue
+
+            if tab.get('type') == 'page' and (not url or url == tab['url']):
                 filtered_tabs.append(tab)
 
         return filtered_tabs
+
+    def get_tab_for_url(self, url):
+        tabs = self.find_browser_tabs(self.ip, url=url, require_ws=False)
+        if not tabs:
+            return None
+
+        id_ = tabs[0]['id']
+        for tab in self.tabs:
+            if tab.tab_id == id_:
+                return tab
+
+        return None
 
     def add_browser_tab(self, ip):
         try:
@@ -334,7 +351,7 @@ class AutoBrowser(object):
                 res = res.json()
             except Exception as e:
                 logging.debug('Browser Init Failed: ' + str(e))
-                return False
+                return None, None, None
 
             if 'cmd_host' in res:
                 break
@@ -350,21 +367,19 @@ class AutoBrowser(object):
 
         # wait to find first aab
         while True:
-            tabs = self.find_browser_tabs(res['ip'])
-            if tabs:
+            tab_datas = self.find_browser_tabs(res['ip'])
+            if tab_datas:
                 break
 
             time.sleep(self.WAIT_TIME)
             logging.debug('Waiting for first tab')
 
         # add other tabs
-        logging.debug('NUM TABS: ' + str(self.auto.num_tabs))
         for tab_count in range(self.auto.num_tabs - 1):
-            logging.debug('NEW TAB START')
-            tab = self.add_browser_tab(res['ip'])
-            tabs.append(tab)
+            tab_data = self.add_browser_tab(res['ip'])
+            tab_datas.append(tab_data)
 
-        return reqid, res['ip'], tabs
+        return reqid, res['ip'], tab_datas
 
     def pubsub_listen(self):
         try:
@@ -390,7 +405,12 @@ class AutoBrowser(object):
                     #logging.debug('AUTOSCROLLING')
 
                 elif msg['ws_type'] == 'autoscroll_resp':
-                    self.load_links()
+                    tab = self.get_tab_for_url(msg['url'])
+                    if tab:
+                        logging.debug('TAB FOUND')
+                        tab.load_links()
+                    else:
+                        logging.debug('TAB NOT FOUND!')
 
             except:
                 traceback.print_exc()
@@ -420,16 +440,14 @@ class AutoBrowser(object):
 
 # ============================================================================
 class AutoTab(object):
-    def __init__(self, browser, tab_id, tab_data):
-        self.tab_id = tab_id
+    def __init__(self, browser, tab_data):
+        self.tab_id = tab_data['id']
         self.browser = browser
         self.redis = browser.redis
         self.auto = browser.auto
         self.browser_q = browser.browser_q
 
         self.tab_data = tab_data
-
-        logging.debug(str(tab_data))
 
         self.ws = websocket.create_connection(tab_data['webSocketDebuggerUrl'])
 
@@ -442,6 +460,7 @@ class AutoTab(object):
         self.callbacks = {}
 
         self.send_ws({"method": "Page.enable"})
+        self.send_ws({"method": "Runtime.enable"})
         logging.debug('Page.enable on ' + tab_data['webSocketDebuggerUrl'])
 
         #self.send_ws({"method": "Console.enable"})
@@ -595,6 +614,7 @@ class AutoTab(object):
             return
 
         if self.auto['autoscroll']:
+            logging.debug('AutoScroll Start')
             self.browser.send_pubsub({'ws_type': 'autoscroll'})
         else:
             self.load_links()

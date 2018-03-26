@@ -1,6 +1,15 @@
 from webrecorder.basecontroller import BaseController
 from bottle import request
 
+import datetime
+import redis
+import json
+import time
+import re
+
+
+TWITTER = re.compile('https?:\/\/twitter.com/(?:hashtag/)?([^/]+)')
+
 
 # ============================================================================
 class ListsController(BaseController):
@@ -96,6 +105,10 @@ class ListsController(BaseController):
             bookmark_list = request.json
 
             for bookmark_data in bookmark_list:
+                m = TWITTER.match(bookmark_data['url'])
+                if m:
+                    self.add_twitter(blist, m.group(1))
+
                 bookmark = blist.create_bookmark(bookmark_data)
 
             return {'list': blist.serialize()}
@@ -165,8 +178,27 @@ class ListsController(BaseController):
 
         bookmark = blist.get_bookmark(bid)
         if not bookmark:
-            self._raise_error(404, 'Bookmark not found in list', api=True,
-                              id=bid)
+            self._raise_error(404, 'Bookmark not found in list', api=True, id=bid)
 
         return blist, bookmark
+
+    def add_twitter(self, blist, handle):
+        for name, url in self.get_twitter_urls(handle):
+            print('Adding Twitter Url: ' + name)
+            bookmark_data = {'url': url, 'title': name}
+            bookmark = blist.create_bookmark(bookmark_data)
+
+    def get_twitter_urls(self, handle):
+        since = None
+        until = None
+        pattern = 'https://twitter.com/search?q=from%3A$handle%20since%3A{since}%20until%3A{until}&src=typd'.replace('$handle', handle)
+
+        for year in range(2018, 2008, -1):
+            for month in range(12, 0, -1):
+                since = until
+                until = '%02d-%02d-01' % (year, month)
+                if since and until:
+                    res = pattern.format(since=until, until=since)
+                    yield since, res
+
 
