@@ -184,7 +184,7 @@ class RunnableAuto(Auto):
         if self['status'] != self.RUNNING:
             return
 
-        if not self.recording.is_open():
+        if not self.recording.is_open(extend=False):
             self['status'] = self.DONE
             logging.debug('Recording Finished, Closing Auto')
             self.redis.rpush(Auto.DEL_AUTO_KEY, self.my_id)
@@ -292,8 +292,6 @@ class AutoBrowser(object):
             tab = AutoTab(self, tab_data)
             self.tabs.append(tab)
 
-        self.running = True
-
         self.auto.browser_added(reqid)
 
         self.pubsub.subscribe('from_cbr_ps:' + reqid)
@@ -365,7 +363,9 @@ class AutoBrowser(object):
 
         logging.debug('Launched: ' + str(res))
 
-        # wait to find first aab
+        self.running = True
+
+        # wait to find first tab
         while True:
             tab_datas = self.find_browser_tabs(res['ip'])
             if tab_datas:
@@ -401,16 +401,11 @@ class AutoBrowser(object):
 
                 if msg['ws_type'] == 'remote_url':
                     pass
-                    #logging.debug('URL LOADED: ' + str(msg))
-                    #logging.debug('AUTOSCROLLING')
 
                 elif msg['ws_type'] == 'autoscroll_resp':
                     tab = self.get_tab_for_url(msg['url'])
                     if tab:
-                        logging.debug('TAB FOUND')
-                        tab.load_links()
-                    else:
-                        logging.debug('TAB NOT FOUND!')
+                        tab.behavior_done()
 
             except:
                 traceback.print_exc()
@@ -448,6 +443,7 @@ class AutoTab(object):
         self.browser_q = browser.browser_q
 
         self.tab_data = tab_data
+        self._behavior_done = False
 
         self.ws = websocket.create_connection(tab_data['webSocketDebuggerUrl'])
 
@@ -471,6 +467,11 @@ class AutoTab(object):
         self.queue_next()
 
     def queue_next(self):
+        self._behavior_done = False
+
+        # extend recording openness
+        self.auto.recording.is_open()
+
         gevent.spawn(self.wait_queue)
 
     def already_recorded(self, url):
@@ -517,7 +518,7 @@ class AutoTab(object):
                 break
 
         if not url_req:
-            logging.debug('Browser Halted')
+            logging.debug('Auto Running?: ' + str(self.browser.running))
             return
 
         def save_frame(resp):
@@ -566,6 +567,13 @@ class AutoTab(object):
 
         finally:
             self.close()
+
+    def behavior_done(self):
+        if self._behavior_done:
+            return
+
+        self._behavior_done = True
+        self.load_links()
 
     def load_links(self):
         #logging.debug('HOPS LEFT: ' + str(self.hops))
@@ -616,6 +624,7 @@ class AutoTab(object):
         if self.auto['autoscroll']:
             logging.debug('AutoScroll Start')
             self.browser.send_pubsub({'ws_type': 'autoscroll'})
+            gevent.spawn_later(30, self.behavior_done)
         else:
             self.load_links()
 
@@ -648,7 +657,10 @@ class AutoTab(object):
         if callback:
             self.callbacks[self.id_count] = callback
 
-        self.ws.send(json.dumps(data))
+        if self.ws:
+            self.ws.send(json.dumps(data))
+        else:
+            logging.debug('WS Already Closed')
 
     def eval(self, expr, callback=None):
         self.send_ws({"method": "Runtime.evaluate", "params": {"expression": expr}}, callback)

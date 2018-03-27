@@ -65,9 +65,12 @@ class Recording(RedisUniqueComponent):
 
         return rec
 
-    def is_open(self):
+    def is_open(self, extend=True):
         open_rec_key = self.OPEN_REC_KEY.format(rec=self.my_id)
-        return self.redis.expire(open_rec_key, self.OPEN_REC_TTL)
+        if extend:
+            return self.redis.expire(open_rec_key, self.OPEN_REC_TTL)
+        else:
+            return self.redis.exists(open_rec_key)
 
     def serialize(self):
         data = super(Recording, self).serialize(include_duration=True)
