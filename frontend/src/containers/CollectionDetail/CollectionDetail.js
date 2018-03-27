@@ -113,6 +113,7 @@ const mapDispatchToProps = (dispatch, { history, match: { params: { user, coll }
           }
         }, () => { console.log('Rec delete error..'); });
     },
+    refresh: () => dispatch(loadColl(user, coll)),
     removeBookmark: (list, id) => {
       dispatch(removeBookmark(user, coll, list, id))
         .then(() => dispatch(loadList(user, coll, list)));
@@ -120,7 +121,6 @@ const mapDispatchToProps = (dispatch, { history, match: { params: { user, coll }
     saveBookmarkSort: (list, ids) => {
       dispatch(saveSort(user, coll, list, ids));
     },
-
     startAuto: (user, coll, listTitle, bookmarks) => {
       let listId;
       let autoId;

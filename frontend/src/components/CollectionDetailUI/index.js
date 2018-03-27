@@ -39,6 +39,7 @@ class CollectionDetailUI extends Component {
     list: PropTypes.object,
     pages: PropTypes.object,
     recordings: PropTypes.object,
+    refresh: PropTypes.func,
     removeBookmark: PropTypes.func,
     saveBookmarkSort: PropTypes.func,
     searchText: PropTypes.string,
@@ -57,6 +58,7 @@ class CollectionDetailUI extends Component {
     this.keyBuffer = [];
     this.matchCode = fromJS([91, 16, 65]);
     this.kbHandle = null;
+    this.refreshHandle = null;
     this.initialState = {
       addToListModal: false,
       checkedLists: {},
@@ -93,6 +95,11 @@ class CollectionDetailUI extends Component {
     if (nextProps.list !== this.props.list) {
       this.setState({ listBookmarks: nextProps.list.get('bookmarks') });
     }
+
+    if (nextProps.autoQueued && !this.props.autoQueued) {
+      setTimeout(this.closeAutoModal, 1500);
+      this.refreshHandle = setInterval(this.refresh, 500);
+    }
   }
 
   shouldComponentUpdate(nextProps) {
@@ -112,6 +119,11 @@ class CollectionDetailUI extends Component {
   }
 
   componentWillUnmount() {
+    // remove automation refresh
+    if (this.refreshHandle) {
+      clearInterval(this.refreshHandle);
+    }
+
     document.removeEventListener('keydown', this.handleKey);
   }
 
@@ -226,6 +238,8 @@ class CollectionDetailUI extends Component {
     const links = listAutoLinks.trim().split('\n').map(o => ({ url: o, title: 'Untitled Document' }));
     this.props.startAuto(collection.get('user'), collection.get('id'), listAutoName, links);
   }
+
+  refresh = () => this.props.refresh()
 
   addToList = () => {
     const { checkedLists, selectedPageIdx } = this.state;
