@@ -84,11 +84,9 @@ class AutoManager(object):
             if not aid:
                 break
 
-            for n, auto in self.autos.items():
-                if n == aid:
-                    auto.close()
-                    self.autos.pop(aid, None)
-                    break
+            auto = self.autos.pop(aid, None)
+            if auto:
+                auto.close()
 
     @classmethod
     def main(cls):
@@ -444,8 +442,7 @@ class AutoTab(object):
 
         self.tab_data = tab_data
         self._behavior_done = False
-
-        self.ws = websocket.create_connection(tab_data['webSocketDebuggerUrl'])
+        self._replaced_with_devtools = False
 
         self.id_count = 0
         self.frame_id = ''
@@ -455,16 +452,29 @@ class AutoTab(object):
 
         self.callbacks = {}
 
-        self.send_ws({"method": "Page.enable"})
-        self.send_ws({"method": "Runtime.enable"})
-        logging.debug('Page.enable on ' + tab_data['webSocketDebuggerUrl'])
-
-        #self.send_ws({"method": "Console.enable"})
+        self._init_ws()
 
         gevent.spawn(self.recv_ws_loop)
 
         # quene next url!
         self.queue_next()
+
+    def _init_ws(self):
+        self.ws = websocket.create_connection(self.tab_data['webSocketDebuggerUrl'])
+        self.send_ws({"method": "Page.enable"})
+        #self.send_ws({"method": "Runtime.enable"})
+        #logging.debug('Page.enable on ' + self.tab_data['webSocketDebuggerUrl'])
+
+    def replace_devtools(self):
+        self._replaced_with_devtools = False
+        while self.browser.running:
+            logging.debug('Waiting for devtools to close')
+            time.sleep(5.0)
+            try:
+                self._init_ws()
+                return
+            except Exception as e:
+                logging.debug(str(e))
 
     def queue_next(self):
         self._behavior_done = False
@@ -545,25 +555,39 @@ class AutoTab(object):
     def recv_ws_loop(self):
         try:
             while self.browser.running:
-                resp = self.ws.recv()
-                resp = json.loads(resp)
+                try:
+                    resp = self.ws.recv()
+                    resp = json.loads(resp)
+                except Exception as re:
+                    if self._replaced_with_devtools:
+                        self.replace_devtools()
+                        continue
+                    else:
+                        raise
 
                 try:
+                    method = resp.get('method')
+
                     if 'result' in resp and 'id' in resp:
                         self.handle_result(resp)
 
-                    elif resp.get('method') == 'Page.frameNavigated':
+                    elif method == 'Page.frameNavigated':
                         self.handle_frameNavigated(resp)
 
-                    elif resp.get('method') == 'Page.frameStoppedLoading':
-                        self.handle_frameStoppedLoading(resp)
+                    elif method == 'Page.loadEventFired':
+                        self.handle_done_loading()
+
+                    elif method == 'Inspector.detached':
+                        self.handle_InspectorDetached(resp)
+
                 except Exception as re:
                     logging.warn('*** Error handling response')
                     logging.warn(str(re))
 
-                logging.debug(str(resp))
+                #logging.debug(str(resp))
+
         except Exception as e:
-            logging.warn(str(e))
+            logging.error(str(e))
 
         finally:
             self.close()
@@ -576,7 +600,6 @@ class AutoTab(object):
         self.load_links()
 
     def load_links(self):
-        #logging.debug('HOPS LEFT: ' + str(self.hops))
         if not self.hops:
             self.queue_next()
             return
@@ -584,8 +607,8 @@ class AutoTab(object):
         def handle_links(resp):
             links = json.loads(resp['result']['result']['value'])
 
-            logging.debug('Links')
-            logging.debug(str(links))
+            #logging.debug('Links')
+            #logging.debug(str(links))
 
             for link in links:
                 url_req = {'url': link}
@@ -609,6 +632,10 @@ class AutoTab(object):
         else:
             logging.debug('No Callback found for: ' + str(resp['id']))
 
+    def handle_InspectorDetached(self, resp):
+        if resp['params']['reason'] == 'replaced_with_devtools':
+            self._replaced_with_devtools = True
+
     def handle_frameStoppedLoading(self, resp):
         frame_id = resp['params']['frameId']
 
@@ -616,6 +643,9 @@ class AutoTab(object):
         if frame_id != self.frame_id:
             return
 
+        self.handle_done_loading()
+
+    def handle_done_loading(self):
         # if not html, continue
         if self.curr_mime != 'text/html':
             self.queue_next()
