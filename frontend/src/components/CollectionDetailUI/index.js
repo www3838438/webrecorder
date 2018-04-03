@@ -56,7 +56,7 @@ class CollectionDetailUI extends Component {
     super(props);
 
     this.keyBuffer = [];
-    this.matchCode = fromJS([91, 16, 65]);
+    this.matchCode = fromJS([17, 16, 65]);
     this.kbHandle = null;
     this.refreshHandle = null;
     this.initialState = {
