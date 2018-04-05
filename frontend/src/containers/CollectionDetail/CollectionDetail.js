@@ -121,11 +121,11 @@ const mapDispatchToProps = (dispatch, { history, match: { params: { user, coll }
     saveBookmarkSort: (list, ids) => {
       dispatch(saveSort(user, coll, list, ids));
     },
-    startAuto: (user, coll, listTitle, bookmarks) => {
+    startAuto: (user, coll, listTitle, bookmarks, hops) => {
       let listId;
       let autoId;
       dispatch(createList(user, coll, listTitle))
-        .then(({ list }) => { listId = list.id; return dispatch(newAuto(user, coll)); })
+        .then(({ list }) => { listId = list.id; return dispatch(newAuto(user, coll, hops)); })
         .then(({ auto }) => { autoId = auto; return dispatch(bulkAddTo(user, coll, listId, bookmarks)); })
         .then(() => dispatch(queueAuto(user, coll, autoId, listId)))
         .then(() => dispatch(loadColl(user, coll)));

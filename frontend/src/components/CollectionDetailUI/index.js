@@ -61,6 +61,7 @@ class CollectionDetailUI extends Component {
     this.refreshHandle = null;
     this.initialState = {
       addToListModal: false,
+      autoHops: 0,
       checkedLists: {},
       expandAll: false,
       groupDisplay: false,
@@ -70,7 +71,6 @@ class CollectionDetailUI extends Component {
       selectedPageIdx: null,
       selectedGroupedPageIdx: null,
       selectedRec: null,
-
       autoModal: false,
       listAutoName: '',
       listAutoLinks: ''
@@ -233,10 +233,10 @@ class CollectionDetailUI extends Component {
 
   startAutomation = () => {
     const { collection } = this.props;
-    const { listAutoName, listAutoLinks } = this.state;
+    const { autoHops, listAutoName, listAutoLinks } = this.state;
 
     const links = listAutoLinks.trim().split('\n').map(o => ({ url: o, title: 'Untitled Document' }));
-    this.props.startAuto(collection.get('user'), collection.get('id'), listAutoName, links);
+    this.props.startAuto(collection.get('user'), collection.get('id'), listAutoName, links, parseInt(autoHops, 10));
   }
 
   refresh = () => this.props.refresh()
@@ -564,10 +564,17 @@ class CollectionDetailUI extends Component {
                   <FormGroup>
                     <ControlLabel>List title:</ControlLabel>
                     <FormControl
-                      id="confirm-delete"
                       type="text"
                       name="listAutoName"
                       value={this.state.listAutoName}
+                      onChange={this.handleChange} />
+                  </FormGroup>
+                  <FormGroup>
+                    <ControlLabel>Link hops:</ControlLabel>
+                    <FormControl
+                      type="text"
+                      name="autoHops"
+                      value={this.state.autoHops}
                       onChange={this.handleChange} />
                   </FormGroup>
                   <FormGroup controlId="formControlsTextarea">

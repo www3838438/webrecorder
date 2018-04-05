@@ -188,13 +188,13 @@ export function setSort(sortBy) {
 }
 
 
-export function newAuto(user, coll) {
+export function newAuto(user, coll, hops = 1) {
   return {
     types: [NEW_AUTO, NEW_AUTO_SUCCESS, NEW_AUTO_FAIL],
     promise: client => client.post(`${apiPath}/auto`, {
       params: { user, coll },
       data: {
-        hops: 1,
+        hops,
         num_tabs: 4,
         max_browsers: 2
       }
